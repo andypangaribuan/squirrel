@@ -21,7 +21,7 @@ import (
 	"github.com/wissance/stringFormatter"
 )
 
-const version = "1.0.0"
+const version = "1.0.1"
 
 var msgHelp string
 
