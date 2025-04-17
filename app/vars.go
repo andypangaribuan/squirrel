@@ -15,3 +15,4 @@ import "squirrel/model"
 var Args *model.Args
 
 const SqCli = "sq"
+const GithubTemplateDirectory = "https://raw.githubusercontent.com/andypangaribuan/squirrel/refs/heads/main/template"

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"squirrel/app"
 	"squirrel/util"
 	"strings"
 
@@ -89,6 +90,12 @@ func getYmlLines(lsYmlTemplate []string, ymlName string) string {
 	workingDir := getWorkingDirectory()
 	ymlFile := getYmlFilePath(lsYmlTemplate, workingDir, ymlName, 1)
 	if ymlFile == "" {
+		command := "curl -s " + app.GithubTemplateDirectory + ymlName + ".yaml"
+		out, err := util.Terminal("", command)
+		if err == nil && out != "" && len(out) > 3 && out[:3] != "404" {
+			return out
+		}
+
 		fmt.Printf("cannot find %v.yml file (up to %v level above)\n", ymlName, searchFileMaxLevelAbove)
 		os.Exit(1)
 	}
