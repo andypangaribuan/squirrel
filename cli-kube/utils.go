@@ -88,25 +88,22 @@ func getSqCliOsEnvs() (envs map[string]string) {
 
 func getYmlLines(lsYmlTemplate []string, ymlName string) string {
 	workingDir := getWorkingDirectory()
-	ymlFile := getYmlFilePath(lsYmlTemplate, workingDir, ymlName, 1)
-	if ymlFile == "" {
-		command := "curl -s " + app.GithubTemplateDirectory + ymlName + ".yaml"
-		out, err := util.Terminal("", command)
-		if err == nil && out != "" && len(out) > 3 && out[:3] != "404" {
-			return out
-		}
-
+	ymlFile, lines := getYmlFilePath(lsYmlTemplate, workingDir, ymlName, 1)
+	if ymlFile == "" && lines == "" {
 		fmt.Printf("cannot find %v.yml file (up to %v level above)\n", ymlName, searchFileMaxLevelAbove)
 		os.Exit(1)
 	}
 
-	data, err := os.ReadFile(ymlFile)
-	if err != nil {
-		fmt.Printf("%+v\n", err)
-		os.Exit(1)
+	if ymlFile != "" {
+		data, err := os.ReadFile(ymlFile)
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
+		}
+
+		lines = string(data)
 	}
 
-	lines := string(data)
 	lines = replaceWithEnv(lines)
 	lines = replaceWithKymlOsEnvs(lines)
 
@@ -164,7 +161,7 @@ func replaceWithKymlOsEnvs(lines string) string {
 	return lines
 }
 
-func getYmlFilePath(lsYmlTemplate []string, workingDir string, optVal string, level int) string {
+func getYmlFilePath(lsYmlTemplate []string, workingDir string, optVal string, level int) (string, string) {
 	if level > searchFileMaxLevelAbove {
 		ymlTemplate := ""
 
@@ -185,33 +182,39 @@ func getYmlFilePath(lsYmlTemplate []string, workingDir string, optVal string, le
 			if ok {
 				filePath := templateDir + string(os.PathSeparator) + ymlTemplate + ".yml"
 				if util.IsFileExists(filePath) {
-					return filePath
+					return filePath, ""
 				}
 
 				filePath = templateDir + string(os.PathSeparator) + ymlTemplate + ".yaml"
 				if util.IsFileExists(filePath) {
-					return filePath
+					return filePath, ""
 				}
+			}
+
+			command := "curl -s " + app.GithubTemplateDirectory + ymlTemplate + ".yaml"
+			out, err := util.Terminal("", command)
+			if err == nil && out != "" && len(out) > 3 && out[:3] != "404" {
+				return "", out
 			}
 		}
 
-		return ""
+		return "", ""
 	}
 
 	filePath := fmt.Sprintf("%v/%v.yml", workingDir, optVal)
 	if util.IsFileExists(filePath) {
-		return filePath
+		return filePath, ""
 	}
 
 	if optVal == "dep" {
 		filePath = fmt.Sprintf("%v/deploy.yml", workingDir)
 		if util.IsFileExists(filePath) {
-			return filePath
+			return filePath, ""
 		}
 
 		filePath = fmt.Sprintf("%v/deployment.yml", workingDir)
 		if util.IsFileExists(filePath) {
-			return filePath
+			return filePath, ""
 		}
 	}
 
