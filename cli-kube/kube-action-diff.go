@@ -43,6 +43,9 @@ EOF`, lines)
 		os.Exit(1)
 	}
 
-	fmt.Println(out)
+	if out != "" {
+		fmt.Println(out)
+	}
+
 	os.Exit(0)
 }

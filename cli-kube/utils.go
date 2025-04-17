@@ -191,7 +191,7 @@ func getYmlFilePath(lsYmlTemplate []string, workingDir string, optVal string, le
 				}
 			}
 
-			command := "curl -s " + app.GithubTemplateDirectory + ymlTemplate + ".yaml"
+			command := "curl -s " + app.GithubTemplateDirectory + ymlTemplate + ".yml"
 			out, err := util.Terminal("", command)
 			if err == nil && out != "" && len(out) > 3 && out[:3] != "404" {
 				return "", out
