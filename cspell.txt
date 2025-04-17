@@ -1,0 +1,26 @@
+pangaribuan
+taskfile
+
+
+
+# project
+clidocker
+clikube
+kyml
+ymls
+statefulset
+minpods
+maxpods
+argm
+
+
+# import
+gmod
+wissance
+joho
+godotenv
+fatih
+apoorvam
+goterminal
+elliotchance
+orderedmap

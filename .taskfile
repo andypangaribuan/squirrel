@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Copyright (c) 2025.
+# Created by Andy Pangaribuan. All Rights Reserved.
+# This product is protected by copyright and distributed under
+# licenses restricting copying, distribution and decompilation.
+
+. ~/.base-taskfile
+
+
+#: update + check
+function run {
+  go mod tidy
+  go vet
+  gofmt -l .
+  golangci-lint run
+  staticcheck ./...
+}
+
+
+#: build the project
+function build {
+  rm -rf squirrel
+  go build
+
+  sudo rm -rf /usr/local/bin/sq &>/dev/null
+  sudo mv squirrel /usr/local/bin/sq
+}
+
+
+#: space
+___ "$@"

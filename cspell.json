@@ -1,0 +1,17 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": [
+    ".gitignore",
+    "*.taskfile"
+  ],
+  "dictionaryDefinitions": [
+    {
+      "name": "project",
+      "path": "./cspell.txt",
+      "addWords": true,
+      "scope": ["workspace"]
+    }
+  ],
+  "dictionaries": ["project"]
+}
