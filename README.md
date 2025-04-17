@@ -4,14 +4,21 @@ sq (squirrel) cli app for more better command
 
 ## Installing
 
-```shell
+Download the sq cli
+
+```sh
 curl -L https://github.com/andypangaribuan/squirrel/releases/latest/download/sq-`uname -s`-`uname -m` -o /usr/local/bin/sq
+```
+
+Make the sq cli executable
+
+```sh
 chmod +x /usr/local/bin/sq
 ```
 
 ## Usage
 
-```shell
+```sh
 sq --help
 ```
 
