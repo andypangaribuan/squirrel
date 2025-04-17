@@ -28,5 +28,16 @@ function build {
 }
 
 
+#: release the cli app
+function release {
+  file=$(echo "sq-$(uname -s)-$(uname -m)" | tr '[:upper:]' '[:lower:]')
+  mkdir -p .releases
+  rm -rf squirrel
+  rm -rf .releases/$file
+  go build
+  mv squirrel .releases/$file
+}
+
+
 #: space
 ___ "$@"

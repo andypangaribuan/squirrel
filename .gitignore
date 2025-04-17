@@ -22,4 +22,5 @@ go.work
 go.work.sum
 
 # squirrel cli
+.releases
 squirrel
