@@ -43,6 +43,8 @@ usage: sq kube action [commands]
                           e.q. {yml-template} {sa1},{svc1}
                           [os env] {export}
                           Yml file inside template directory: {sa2}, {svc2}
+                          But if it didn't exists in template directory, then it will search to github repo
+                          {github-repo}
 `, map[string]any{
 	"commands":     util.ColorBoldGreen("commands:"),
 	"options":      util.ColorBoldGreen("options:"),
@@ -58,4 +60,5 @@ usage: sq kube action [commands]
 	"sa2":          util.ColorBoldRed("sa.yml"),
 	"svc1":         util.ColorBoldRed("svc-rest"),
 	"svc2":         util.ColorBoldRed("svc-rest.yml"),
+	"github-repo":  util.ColorBoldGreen("https://github.com/andypangaribuan/squirrel/tree/main/template"),
 })
