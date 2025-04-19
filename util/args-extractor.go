@@ -88,6 +88,9 @@ func ArgsExtractor() *model.Args {
 		case "watch":
 			args.IsWatch = true
 
+		case "rollout":
+			args.IsRollout = true
+
 		case "logs":
 			args.IsLogs = true
 

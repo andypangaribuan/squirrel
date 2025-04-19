@@ -22,6 +22,9 @@ func kubeActionPods(namespace string, appName string) {
 	case args.IsWatch:
 		kubeActionPodsWatch(namespace, appName)
 
+	case args.IsRollout:
+		kubeActionPodsRollout(namespace, appName)
+
 	case args.IsLogs:
 		kubeActionPodsLogs(namespace, appName)
 

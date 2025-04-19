@@ -26,24 +26,25 @@ type Args struct {
 	IsOptWatch bool
 	IsVersion  bool
 
-	IsDocker bool
-	IsPs     bool
-	IsImages bool
-	IsKube   bool
-	IsInfo   bool
-	IsAction bool
-	IsApply  bool
-	IsYml    bool
-	IsDiff   bool
-	IsDelete bool
-	IsConf   bool
-	IsSecret bool
-	IsExec   bool
-	IsPods   bool
-	IsLs     bool
-	IsWatch  bool
-	IsLogs   bool
-	IsEvents bool
+	IsDocker  bool
+	IsPs      bool
+	IsImages  bool
+	IsKube    bool
+	IsInfo    bool
+	IsAction  bool
+	IsApply   bool
+	IsYml     bool
+	IsDiff    bool
+	IsDelete  bool
+	IsConf    bool
+	IsSecret  bool
+	IsExec    bool
+	IsPods    bool
+	IsLs      bool
+	IsWatch   bool
+	IsRollout bool
+	IsLogs    bool
+	IsEvents  bool
 }
 
 func (slf *Args) SetArgs(args []string) {

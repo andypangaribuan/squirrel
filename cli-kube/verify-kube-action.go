@@ -268,6 +268,11 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 				removeOptKeyVal()
 			}
 
+			if args.IsRollout {
+				optKeyVal = "rollout"
+				removeOptKeyVal()
+			}
+
 			if args.IsLogs {
 				_, optKeyVal, _ = args.GetOptVal(remains, "logs")
 				removeOptKeyVal()
