@@ -90,6 +90,9 @@ func ArgsExtractor() *model.Args {
 
 		case "logs":
 			args.IsLogs = true
+
+		case "events":
+			args.IsEvents = true
 		}
 	}
 

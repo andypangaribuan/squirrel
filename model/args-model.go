@@ -43,6 +43,7 @@ type Args struct {
 	IsLs     bool
 	IsWatch  bool
 	IsLogs   bool
+	IsEvents bool
 }
 
 func (slf *Args) SetArgs(args []string) {

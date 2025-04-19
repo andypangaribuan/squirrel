@@ -12,6 +12,7 @@ package clikube
 
 const searchFileMaxLevelAbove = 4
 const singleSpace = " "
+const doubleSpace = "  "
 
 const keyKymlPvName = "KYML_PV_NAME"
 const keyKymlPvcName = "KYML_PVC_NAME"

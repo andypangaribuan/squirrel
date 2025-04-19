@@ -26,15 +26,19 @@ func ZInteractiveTerminal(workingDirectory string, script string, envs ...string
 	return execInteractiveTerminal(true, workingDirectory, script, envs...)
 }
 
-func Terminal(workingDirectory string, script string) (out string, err *string) {
-	return execTerminal(false, workingDirectory, script)
+func Terminal(workingDirectory string, script string, args ...any) (out string, err *string) {
+	return execTerminal(false, workingDirectory, script, args...)
 }
 
-func ZTerminal(workingDirectory string, script string) (out string, err *string) {
-	return execTerminal(true, workingDirectory, script)
+func ZTerminal(workingDirectory string, script string, args ...any) (out string, err *string) {
+	return execTerminal(true, workingDirectory, script, args...)
 }
 
-func execTerminal(withZshrc bool, workingDirectory string, script string) (out string, err *string) {
+func execTerminal(withZshrc bool, workingDirectory string, script string, args ...any) (out string, err *string) {
+	if len(args) > 0 {
+		script = fmt.Sprintf(script, args...)
+	}
+
 	if workingDirectory != "" {
 		script = fmt.Sprintf("cd %v; %v", workingDirectory, script)
 	}

@@ -28,7 +28,7 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 		workingDir = getWorkingDirectory()
 		envs       = getEnvs(workingDir)
 		command    = "kube action"
-		remains    = args.GetRemains(command, "--help")
+		remains    = args.GetRemains(command, "--help", "--watch")
 		optKey     string
 		optKeyVal  string
 		optVal     string
@@ -109,20 +109,32 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 		return exit()
 	}
 
-	ls := strings.Split(optVal, ",")
-	for _, v := range ls {
-		v = strings.TrimSpace(v)
-		if !fm.IfHaveIn(v, availableYml...) {
-			return exit()
-		}
+	if optVal != "" {
+		ls := strings.Split(optVal, ",")
+		for _, v := range ls {
+			v = strings.TrimSpace(v)
+			if !fm.IfHaveIn(v, availableYml...) {
+				return exit()
+			}
 
-		lsYml = append(lsYml, v)
+			lsYml = append(lsYml, v)
+		}
 	}
 
 	if len(lsYml) == 0 {
-		return exit()
+		isExit := true
+		if args.IsPods && args.IsEvents && util.ReplaceDoubleSpaceToSingleSpace(remains) == "pods events" {
+			isExit = false
+		}
+
+		if isExit {
+			return exit()
+		}
 	}
-	removeOptKeyVal()
+
+	if optKeyVal != "" {
+		removeOptKeyVal()
+	}
 
 	// verify: --yml-template
 	optKey, optKeyVal, optVal = args.GetOptVal(remains, "--yml-template")
@@ -258,6 +270,11 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 
 			if args.IsLogs {
 				_, optKeyVal, _ = args.GetOptVal(remains, "logs")
+				removeOptKeyVal()
+			}
+
+			if args.IsEvents {
+				optKeyVal = "events"
 				removeOptKeyVal()
 			}
 		}

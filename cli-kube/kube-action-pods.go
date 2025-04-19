@@ -24,5 +24,8 @@ func kubeActionPods(namespace string, appName string) {
 
 	case args.IsLogs:
 		kubeActionPodsLogs(namespace, appName)
+
+	case args.IsEvents:
+		kubeActionPodsEvents(namespace, appName)
 	}
 }

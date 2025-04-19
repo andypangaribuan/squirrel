@@ -179,3 +179,10 @@ func UnknownCommand(remainsCommand string, helpMessage string) {
 
 	PrintHelp(msg, true)
 }
+
+func ReplaceDoubleSpaceToSingleSpace(value string) string {
+	for strings.Contains(value, doubleSpace) {
+		value = strings.ReplaceAll(value, doubleSpace, singleSpace)
+	}
+	return value
+}
