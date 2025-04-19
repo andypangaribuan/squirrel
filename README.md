@@ -16,6 +16,14 @@ sudo chmod +x /usr/local/bin/sq
 sq --help
 ```
 
+## Third party package
+
+This sq cli using 3rd party package, you can install using brew:
+
+- watch (brew install watch)
+- expect (brew install expect), this for unbuffer cli
+- kubectl (brew install kubernetes-cli)
+
 ## Versioning
 
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/andypangaribuan/squirrel/tags).
