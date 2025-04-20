@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  type: ClusterIP
+  selector:
+    app: $KYML_APP_NAME
+  ports:
+    - name: $KYML_GRPC_PORT_NAME
+      port: $KYML_GRPC_PORT_NUMBER
+      targetPort: $KYML_GRPC_PORT_NUMBER

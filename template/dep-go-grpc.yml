@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+spec:
+  replicas: $KYML_POD_REPLICA
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 30%
+      maxSurge: 40%
+  selector:
+    matchLabels:
+      app: $KYML_APP_NAME
+  template:
+    metadata:
+      labels:
+        app: $KYML_APP_NAME
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "$KYML_POD_SAFE_TO_EVICT"
+        linkerd.io/inject: enabled
+        config.linkerd.io/proxy-cpu-request: $KYML_CPU_REQUEST
+        config.linkerd.io/proxy-memory-request: $KYML_MEMORY_REQUEST
+        config.linkerd.io/proxy-memory-limit: $KYML_MEMORY_LIMIT
+    spec:
+      priorityClassName: $KYML_PRIORITY_CLASS
+      terminationGracePeriodSeconds: 60
+      serviceAccountName: $KYML_APP_NAME
+      containers:
+        - name: $KYML_APP_NAME
+          image: $KYML_IMAGE_PATH:$KYML_IMAGE_VERSION
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: $KYML_GRPC_PORT_NAME
+              containerPort: $KYML_GRPC_PORT_NUMBER
+          envFrom:
+            - secretRef:
+                name: $KYML_APP_NAME
+          resources:
+            requests:
+              cpu: $KYML_CPU_REQUEST
+              memory: $KYML_MEMORY_REQUEST
+              ephemeral-storage: $KYML_EPHEMERAL_STORAGE
+            limits:
+              memory: $KYML_MEMORY_LIMIT
+              ephemeral-storage: $KYML_EPHEMERAL_STORAGE
+          readinessProbe:
+            grpc:
+              port: $KYML_GRPC_PORT_NUMBER
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            grpc:
+              port: $KYML_GRPC_PORT_NUMBER
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
