@@ -225,19 +225,21 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 	}
 
 	// verify: delete
-	optKey, optKeyVal, optVal = args.GetOptVal(remains, "delete")
-	if optKey != "" {
-		if optVal == "" {
-			return exit()
-		}
+	if len(remains) > 5 && remains[:5] != "pods"+singleSpace {
+		optKey, optKeyVal, optVal = args.GetOptVal(remains, "delete")
+		if optKey != "" {
+			if optVal == "" {
+				return exit()
+			}
 
-		if !fm.IfHaveIn(optVal, availableYml...) {
-			return exit()
-		}
+			if !fm.IfHaveIn(optVal, availableYml...) {
+				return exit()
+			}
 
-		removeOptKeyVal()
-		if remains != "" {
-			return exit()
+			removeOptKeyVal()
+			if remains != "" {
+				return exit()
+			}
 		}
 	}
 
@@ -270,6 +272,15 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 
 			if args.IsRollout {
 				optKeyVal = "rollout"
+				removeOptKeyVal()
+			}
+
+			if args.IsDelete {
+				_, optKeyVal, optVal = args.GetOptVal(remains, "delete")
+				if optVal == "" {
+					return exit()
+				}
+
 				removeOptKeyVal()
 			}
 

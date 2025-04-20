@@ -25,6 +25,9 @@ func kubeActionPods(namespace string, appName string) {
 	case args.IsRollout:
 		kubeActionPodsRollout(namespace, appName)
 
+	case args.IsDelete:
+		kubeActionPodsDelete(namespace, appName)
+
 	case args.IsLogs:
 		kubeActionPodsLogs(namespace, appName)
 

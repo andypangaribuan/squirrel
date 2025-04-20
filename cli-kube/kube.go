@@ -54,7 +54,7 @@ func Exec() {
 			return
 		}
 
-		if args.IsDelete {
+		if args.IsDelete && !args.IsPods {
 			kubeActionDelete(lsYml, lsYmlTemplate)
 			return
 		}
