@@ -43,6 +43,7 @@ type Args struct {
 	IsLs      bool
 	IsWatch   bool
 	IsRollout bool
+	IsScale   bool
 	IsLogs    bool
 	IsEvents  bool
 }

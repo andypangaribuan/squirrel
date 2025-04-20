@@ -13,6 +13,7 @@ package clikube
 import (
 	"squirrel/app"
 	"squirrel/util"
+	"strconv"
 	"strings"
 
 	"github.com/andypangaribuan/gmod/fm"
@@ -278,6 +279,20 @@ func verifyKubeAction() (namespace string, appName string, lsYml []string, lsYml
 			if args.IsDelete {
 				_, optKeyVal, optVal = args.GetOptVal(remains, "delete")
 				if optVal == "" {
+					return exit()
+				}
+
+				removeOptKeyVal()
+			}
+
+			if args.IsScale {
+				_, optKeyVal, optVal = args.GetOptVal(remains, "scale")
+				if optVal == "" {
+					return exit()
+				}
+
+				_, err := strconv.Atoi(optVal)
+				if err != nil {
 					return exit()
 				}
 

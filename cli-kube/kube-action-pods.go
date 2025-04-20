@@ -28,6 +28,9 @@ func kubeActionPods(namespace string, appName string) {
 	case args.IsDelete:
 		kubeActionPodsDelete(namespace, appName)
 
+	case args.IsScale:
+		kubeActionPodsScale(namespace, appName)
+
 	case args.IsLogs:
 		kubeActionPodsLogs(namespace, appName)
 
