@@ -13,6 +13,3 @@ spec:
     - name: $KYML_HTTP_PORT_NAME
       port: $KYML_HTTP_PORT_NUMBER
       targetPort: $KYML_HTTP_PORT_NUMBER
-    - name: $KYML_GRPC_PORT_NAME
-      port: $KYML_GRPC_PORT_NUMBER
-      targetPort: $KYML_GRPC_PORT_NUMBER

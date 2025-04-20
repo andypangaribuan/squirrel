@@ -27,15 +27,15 @@ func kubeAction(lsYml []string) {
 
 	util.PrintHelp(stringFormatter.FormatComplex(`
 {commands}
-  apply         Apply yml configuration   : {ys}
-  yml           Show content of yml file  : {ys}
-  diff          Compare yml configuration : {ys}
-  delete        Delete yml configuration  : {ys}
+  apply           Apply yml configuration   : {ys}
+  yml             Show content of yml file  : {ys}
+  diff            Compare yml configuration : {ys}
+  delete          Delete yml configuration  : {ys}
 
-  conf          Show all configurations
-  secret        Show all decoded secret
-  exec {name}   Go to shell pod (default: first pod)
-  pods          Execute pods cli
+  conf            Show all configurations
+  secret          Show all decoded secret
+  exec {name}     Go to shell pod (default: first pod)
+  pods            Execute pods cli
 
 {pods-subcommand}
   ls              Show running pods
