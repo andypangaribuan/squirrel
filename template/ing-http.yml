@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400s"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400s"
+
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: $KYML_ING_TLS_NAME
+      hosts:
+        - $KYML_ING_DOMAIN
+
+  rules:
+    - host: $KYML_ING_DOMAIN
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: $KYML_APP_NAME
+                port:
+                  number: $KYML_HTTP_PORT_NUMBER
