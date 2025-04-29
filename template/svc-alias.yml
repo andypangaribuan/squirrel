@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+spec:
+  clusterIP: None
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+subsets:
+  - addresses:
+      - ip: $KYML_EXTERNAL_IP
