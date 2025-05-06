@@ -15,6 +15,7 @@ import (
 	"os"
 	"squirrel/app"
 	"squirrel/util"
+	"strings"
 
 	"github.com/andypangaribuan/gmod/fm"
 )
@@ -43,5 +44,5 @@ EOF`, lines)
 		os.Exit(1)
 	}
 
-	fmt.Println(out)
+	fmt.Println(fm.Ternary(len(strings.Split(strings.TrimSpace(out), "\n")) == 1, strings.TrimSpace(out), out))
 }
