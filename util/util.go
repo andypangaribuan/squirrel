@@ -186,4 +186,3 @@ func ReplaceDoubleSpaceToSingleSpace(value string) string {
 	}
 	return value
 }
-

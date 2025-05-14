@@ -50,6 +50,7 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 		outHPA      string
 		outSVC      string
 		outING      string
+		outIngGrpc  string
 		outStateful string
 		outPV       string
 		outPVC      string
@@ -65,12 +66,23 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 		return out
 	}
 
-	updateOutput := func(isHave bool, title string, out string) {
+	updateOutput := func(isHave bool, title string, out1 string, out2 string) {
 		if isHave {
-			if out == nilMessage {
+			out := nilMessage
+
+			if out1 == nilMessage && out2 == nilMessage {
 				title = util.ColorBoldRed(title)
 			} else {
 				title = util.ColorBoldGreen(title)
+			}
+
+			switch {
+			case out1 != nilMessage && out2 != "":
+				out = out1 + "\n" + out2
+			case out1 != nilMessage:
+				out = out1
+			case out2 != "":
+				out = out2
 			}
 
 			output += fm.Ternary(output == "", "", "\n\n") +
@@ -79,7 +91,7 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 		}
 	}
 
-	run := func(isHave bool, key string, ref *string) {
+	run := func(isHave bool, key string, ref1 *string, ref2 *string) {
 		if isHave {
 			script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v -n %v", key, appName, namespace)
 			if key == "pv" {
@@ -89,13 +101,14 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 			wg.Add(1)
 
 			go func() {
-				out := exec(script)
+				out1 := exec(script)
+				out2 := ""
 
 				if key == "svc" {
-					if out != "" {
+					if out1 != "" {
 						endpoint := ""
 
-						keys, vals := util.MapKV(out, "NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE")
+						keys, vals := util.MapKV(out1, "NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE")
 						if len(vals) > 0 {
 							if index, ok := keys["CLUSTER-IP"]; ok {
 								clusterIp := strings.ToLower(vals[0][index])
@@ -117,111 +130,114 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 							}
 						}
 
-						out = strings.TrimSpace(out)
+						out1 = strings.TrimSpace(out1)
 						if endpoint != "" {
-							out += "\n" + util.ColorCyan("ep ") + util.ColorYellow(endpoint)
+							out1 += "\n" + util.ColorCyan("ep ") + util.ColorYellow(endpoint)
 						}
 
 						if namespace != "" && appName != "" {
 							port := util.ColorCyan("{port}")
 							arrow := util.ColorCyan(fm.Ternary(endpoint == "", "", " ") + "→ ")
-							out += "\n" + arrow + util.ColorYellow(appName+"."+namespace+":") + port +
+							out1 += "\n" + arrow + util.ColorYellow(appName+"."+namespace+":") + port +
 								"\n" + arrow + util.ColorYellow(appName+"."+namespace+".svc.cluster.local:") + port
 						}
 					}
 				}
 
 				if key == "ing" {
-					if out == "" {
-						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-grpc -n %v", key, appName, namespace)
-						out = exec(script)
-					}
+					script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-grpc -n %v", key, appName, namespace)
+					out2 = exec(script)
 				}
 
 				if key == "pv" {
-					if out == "" {
+					if out1 == "" {
 						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-pv", key, appName)
-						out = exec(script)
+						out1 = exec(script)
 					}
 
-					if out == "" {
+					if out1 == "" {
 						if name, ok := envs[keyKymlPvName]; ok {
 							script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v", key, name)
-							out = exec(script)
+							out1 = exec(script)
 						}
 					}
 
-					if out == "" {
+					if out1 == "" {
 						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-%v-pv", key, appName, namespace)
-						out = exec(script)
+						out1 = exec(script)
 					}
 				}
 
 				if key == "pvc" {
-					if out == "" {
+					if out1 == "" {
 						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-pvc -n %v", key, appName, namespace)
-						out = exec(script)
+						out1 = exec(script)
 					}
 
-					if out == "" {
+					if out1 == "" {
 						if name, ok := envs[keyKymlPvcName]; ok {
 							script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v -n %v", key, name, namespace)
-							out = exec(script)
+							out1 = exec(script)
 						}
 					}
 
-					if out == "" {
+					if out1 == "" {
 						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v%v-pvc -n %v", key, appName, namespace, namespace)
-						out = exec(script)
+						out1 = exec(script)
 					}
 				}
 
-				out = strings.TrimSpace(out)
-				*ref = fm.Ternary(out == "", nilMessage, out)
+				out1 = strings.TrimSpace(out1)
+				out2 = strings.TrimSpace(out2)
+
+				*ref1 = fm.Ternary(out1 == "", nilMessage, out1)
+				if ref2 != nil && out2 != "" {
+					*ref2 = out2
+				}
 
 				wg.Done()
 			}()
 		}
 	}
 
-	run(isHaveSA, "sa", &outSA)
-	run(isHaveCM, "cm", &outCM)
-	run(isHaveSecret, "secret", &outSecret)
-	run(isHaveDep, "deploy", &outDep)
-	run(isHavePDB, "pdb", &outPDB)
-	run(isHaveHPA, "hpa", &outHPA)
-	run(isHaveSVC, "svc", &outSVC)
-	run(isHaveING, "ing", &outING)
-	run(isHaveStateful, "statefulset", &outStateful)
-	run(isHavePV, "pv", &outPV)
-	run(isHavePVC, "pvc", &outPVC)
+	run(isHaveSA, "sa", &outSA, nil)
+	run(isHaveCM, "cm", &outCM, nil)
+	run(isHaveSecret, "secret", &outSecret, nil)
+	run(isHaveDep, "deploy", &outDep, nil)
+	run(isHavePDB, "pdb", &outPDB, nil)
+	run(isHaveHPA, "hpa", &outHPA, nil)
+	run(isHaveSVC, "svc", &outSVC, nil)
+	run(isHaveING, "ing", &outING, &outIngGrpc)
+	run(isHaveStateful, "statefulset", &outStateful, nil)
+	run(isHavePV, "pv", &outPV, nil)
+	run(isHavePVC, "pvc", &outPVC, nil)
 
 	wg.Wait()
 
 	for _, yml := range lsYml {
 		switch yml {
 		case "sa":
-			updateOutput(isHaveSA, "SERVICE ACCOUNT", outSA)
+			updateOutput(isHaveSA, "SERVICE ACCOUNT", outSA, "")
 		case "cm":
-			updateOutput(isHaveCM, "CONFIG MAP", outCM)
+			updateOutput(isHaveCM, "CONFIG MAP", outCM, "")
 		case "secret":
-			updateOutput(isHaveSecret, "SECRET", outSecret)
+			updateOutput(isHaveSecret, "SECRET", outSecret, "")
 		case "dep":
-			updateOutput(isHaveDep, "DEPLOYMENT", outDep)
+			updateOutput(isHaveDep, "DEPLOYMENT", outDep, "")
 		case "pdb":
-			updateOutput(isHavePDB, "POD DISRUPTION BUDGET", outPDB)
+			updateOutput(isHavePDB, "POD DISRUPTION BUDGET", outPDB, "")
 		case "hpa":
-			updateOutput(isHaveHPA, "HORIZONTAL POD AUTOSCALER", outHPA)
+			updateOutput(isHaveHPA, "HORIZONTAL POD AUTOSCALER", outHPA, "")
 		case "svc":
-			updateOutput(isHaveSVC, "SERVICES", outSVC)
+			updateOutput(isHaveSVC, "SERVICES", outSVC, "")
 		case "ing":
-			updateOutput(isHaveING, "INGRESS", outING)
+			updateOutput(isHaveING, "INGRESS", outING, outIngGrpc)
 		case "stateful":
-			updateOutput(isHaveStateful, "STATEFUL SET", outStateful)
+			updateOutput(isHaveStateful, "STATEFUL SET", outStateful, "")
 		case "pv":
-			updateOutput(isHavePV, "PERSISTENT VOLUME", outPV)
+			updateOutput(isHavePV, "PERSISTENT VOLUME", outPV, "")
 		case "pvc":
-			updateOutput(isHavePVC, "PERSISTENT VOLUME CLAIM", outPVC)
+			updateOutput(isHavePVC, "PERSISTENT VOLUME CLAIM", outPVC, "")
 		}
 	}
 
