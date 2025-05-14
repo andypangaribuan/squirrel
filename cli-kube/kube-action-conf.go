@@ -131,6 +131,13 @@ func kubeActionConf(namespace string, appName string, lsYml []string) {
 					}
 				}
 
+				if key == "ing" {
+					if out == "" {
+						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-grpc -n %v", key, appName, namespace)
+						out = exec(script)
+					}
+				}
+
 				if key == "pv" {
 					if out == "" {
 						script := fmt.Sprintf("kubectl get %v --field-selector metadata.name=%v-pv", key, appName)
