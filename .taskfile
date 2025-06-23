@@ -17,6 +17,21 @@ function run {
   staticcheck ./...
 }
 
+
+#: run cspell to check the project words
+function spell {
+  img=ghcr.io/streetsidesoftware/cspell:9.0.1
+  docker run --rm \
+    --platform linux/amd64 \
+    -v $PWD:/workdir \
+    $img "**" \
+    --quiet
+}
+
+
+#: space
+
+
 #: build the project
 function build {
   rm -rf squirrel
@@ -25,6 +40,7 @@ function build {
   sudo rm -rf /usr/local/bin/sq &>/dev/null
   sudo mv squirrel /usr/local/bin/sq
 }
+
 
 #: release the cli app
 function release {

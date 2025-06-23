@@ -1,27 +1,21 @@
-pangaribuan
-taskfile
+gmod
 
-
-
-# project
 clidocker
 clikube
 clitaskfile
-kyml
-ymls
 statefulset
-minpods
-maxpods
-argm
 
-
-# import
-gmod
-wissance
-joho
 godotenv
+goterminal
+wissance
 fatih
 apoorvam
-goterminal
-elliotchance
 orderedmap
+elliotchance
+joho
+
+KYML
+MINPODS
+MAXPODS
+ymls
+argm

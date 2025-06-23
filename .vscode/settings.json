@@ -45,12 +45,6 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "cSpell.words": [
-    "apangaribuan",
-    "pangaribuan",
-    "andypangaribuan",
-    "decompilation"
-  ],
   "merge-conflict.autoNavigateNextConflict.enabled": true,
   "merge-conflict.diffViewPosition": "Current",
   "git.mergeEditor": true,
