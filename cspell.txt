@@ -6,6 +6,7 @@ taskfile
 # project
 clidocker
 clikube
+clitaskfile
 kyml
 ymls
 statefulset

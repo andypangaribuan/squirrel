@@ -99,6 +99,9 @@ func ArgsExtractor() *model.Args {
 
 		case "events":
 			args.IsEvents = true
+
+		case "taskfile":
+			args.IsTaskFile = true
 		}
 	}
 

@@ -15,13 +15,14 @@ import (
 	"os"
 	clidocker "squirrel/cli-docker"
 	clikube "squirrel/cli-kube"
+	clitaskfile "squirrel/cli-taskfile"
 	"squirrel/util"
 
 	_ "github.com/andypangaribuan/gmod"
 	"github.com/wissance/stringFormatter"
 )
 
-const version = "1.0.3"
+const version = "1.0.4"
 
 var msgHelp string
 
@@ -30,9 +31,10 @@ func init() {
 usage: sq [commands]
 
 {commands}
-  docker    Execute docker cli
-  kube      Execute kubectl cli
-  version   Print sq-cli version
+  docker     Execute docker cli
+  kube       Execute kubectl cli
+  taskfile   Execute taskfile cli
+  version    Print sq-cli version
 `, map[string]any{
 		"commands": util.ColorBoldGreen("commands:"),
 	})
@@ -52,6 +54,9 @@ func main() {
 
 	case args.IsKube:
 		clikube.Exec()
+
+	case args.IsTaskFile:
+		clitaskfile.Exec()
 
 	case args.IsOptHelp:
 		util.PrintHelp(msgHelp, false)

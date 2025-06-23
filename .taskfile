@@ -17,7 +17,6 @@ function run {
   staticcheck ./...
 }
 
-
 #: build the project
 function build {
   rm -rf squirrel
@@ -26,7 +25,6 @@ function build {
   sudo rm -rf /usr/local/bin/sq &>/dev/null
   sudo mv squirrel /usr/local/bin/sq
 }
-
 
 #: release the cli app
 function release {
@@ -37,6 +35,7 @@ function release {
   go build
   mv squirrel .releases/$file
 }
+
 
 
 #: space
