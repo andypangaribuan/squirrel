@@ -7,7 +7,8 @@
       "request": "launch",
       "mode": "debug",
       "program": "main.go",
-      "args": ["taskfile", "--help"]
+      "args": ["docker", "version", "--help"]
+      // "args": ["taskfile"]
     }
   ]
 }
