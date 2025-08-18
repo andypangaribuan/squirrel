@@ -15,7 +15,10 @@ import (
 	"os"
 	"squirrel/app"
 	"squirrel/util"
+	"strconv"
 	"strings"
+
+	"github.com/andypangaribuan/gmod/fm"
 )
 
 func dockerPs(doPrint ...bool) string {
@@ -45,26 +48,24 @@ func dockerPs(doPrint ...bool) string {
 
 	// set items
 	for i, ls := range vals {
+		activePorts := make([]string, 0)
+
 		port := util.VTrim(ls, idxPort)
 		if port != "" {
-			out := ""
 			ls := strings.Split(port, ",")
 			for _, v := range ls {
 				v = strings.TrimSpace(v)
 				if strings.Contains(v, "->") {
 					ipPort := strings.Split(v, "->")[0]
 					if strings.Contains(ipPort, ":") {
-						portValue := strings.Split(ipPort, ":")[1]
-						if out != "" {
-							out += ","
+						ls := strings.Split(ipPort, ":")
+						last := ls[len(ls)-1]
+						_, err := strconv.Atoi(last)
+						if err == nil && !fm.IfHaveIn(last, activePorts...) {
+							activePorts = append(activePorts, last)
 						}
-						out += portValue
 					}
 				}
-			}
-
-			if out != "" {
-				port = out
 			}
 		}
 
@@ -72,7 +73,7 @@ func dockerPs(doPrint ...bool) string {
 			i + 1,
 			util.VTrim(ls, idxName),
 			util.VTrim(ls, idxStatus),
-			port,
+			strings.Join(activePorts, ", "),
 			util.VTrim(ls, idxImage),
 		})
 	}

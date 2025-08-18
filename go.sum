@@ -16,8 +16,8 @@ cloud.google.com/go/storage v1.43.0/go.mod h1:ajvxEa7WmZS1PxvKRq4bq0tFT3vMd502Jw
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/KimMachineGun/automemlimit v0.6.1 h1:ILa9j1onAAMadBsyyUJv5cack8Y1WT26yLj/V+ulKp8=
 github.com/KimMachineGun/automemlimit v0.6.1/go.mod h1:T7xYht7B8r6AG/AqFcUdc7fzd2bIdBKmepfP2S1svPY=
-github.com/andypangaribuan/gmod v1.0.44 h1:DTcOhVvFS7idGmc+6OgXudJw+Q50TpNN35wdxAPR8n4=
-github.com/andypangaribuan/gmod v1.0.44/go.mod h1:/CU0HHs+OXzMLDiA4Wyb177k+h9jdfRsUI8i1lA1Apc=
+github.com/andypangaribuan/gmod v1.0.69 h1:qwJ9EN4byaVXjRVJtfzcHjGHTtG2Jh+o3xXROJrY6ig=
+github.com/andypangaribuan/gmod v1.0.69/go.mod h1:/CU0HHs+OXzMLDiA4Wyb177k+h9jdfRsUI8i1lA1Apc=
 github.com/apoorvam/goterminal v0.0.0-20180523175556-614d345c47e5 h1:VYqcjykqpcq262cDxBAkAelSdg6HETkxgwzQRTS40Aw=
 github.com/apoorvam/goterminal v0.0.0-20180523175556-614d345c47e5/go.mod h1:E7x8aDc3AQzDKjEoIZCt+XYheHk2OkP+p2UgeNjecH8=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
