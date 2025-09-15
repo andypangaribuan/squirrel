@@ -32,7 +32,7 @@ function spell {
 #: space
 
 
-#: build the project
+#: build the project and move to local machine
 function build {
   rm -rf squirrel
   go build
