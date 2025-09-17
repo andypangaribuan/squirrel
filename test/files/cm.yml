@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: $KYML_APP_NAME
-  namespace: $KYML_NAMESPACE
-data: $KYML_CM_DATA

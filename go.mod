@@ -1,14 +1,13 @@
 module squirrel
 
-go 1.23.1
+go 1.24.2
 
 require (
 	github.com/andypangaribuan/gmod v1.0.69
 	github.com/apoorvam/goterminal v0.0.0-20180523175556-614d345c47e5
-	github.com/elliotchance/orderedmap/v3 v3.1.0
 	github.com/fatih/color v1.18.0
 	github.com/joho/godotenv v1.5.1
-	github.com/wissance/stringFormatter v1.4.1
+	github.com/wissance/stringFormatter v1.6.1
 )
 
 require (

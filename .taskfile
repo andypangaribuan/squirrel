@@ -34,12 +34,11 @@ function spell {
 
 #: build the project and move to local machine
 function build {
-  # rm -rf squirrel
-  # go build
+  rm -rf squirrel
+  go build
 
   sudo rm -rf /usr/local/bin/sq &>/dev/null
-  # sudo mv squirrel /usr/local/bin/sq
-  sudo cp squirrel /usr/local/bin/sq
+  sudo mv squirrel /usr/local/bin/sq
 }
 
 

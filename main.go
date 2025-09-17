@@ -12,56 +12,38 @@ package main
 
 import (
 	"fmt"
-	"os"
-	clidocker "squirrel/cli-docker"
-	clikube "squirrel/cli-kube"
-	clitaskfile "squirrel/cli-taskfile"
+	"squirrel/arg"
+	"squirrel/cli/docker"
+	"squirrel/cli/kube"
+	"squirrel/cli/taskfile"
 	"squirrel/util"
 
 	_ "github.com/andypangaribuan/gmod"
 	"github.com/wissance/stringFormatter"
 )
 
-const version = "1.0.4"
-
-var msgHelp string
-
-func init() {
-	msgHelp = stringFormatter.FormatComplex(`
-usage: sq [commands]
-
-{commands}
-  docker     Execute docker cli
-  kube       Execute kubectl cli
-  taskfile   Execute taskfile cli
-  version    Print sq-cli version
-`, map[string]any{
-		"commands": util.ColorBoldGreen("commands:"),
-	})
-}
+const version = "2.0.0"
 
 func main() {
 	util.ExitWithCtrlC()
-	args := util.ArgsExtractor()
+	arg.Init()
 
-	switch {
-	case args.IsVersion:
-		fmt.Printf("version %v\n", version)
-		os.Exit(0)
+	helpMessage := stringFormatter.FormatComplex(`
+usage: sq
 
-	case args.IsDocker:
-		clidocker.Exec()
+{commands}
+  docker     execute docker cli
+  kube       execute kubectl cli
+  taskfile   execute taskfile cli
+  version    print sq-cli version
+`, map[string]any{
+		"commands": util.ColorBoldGreen("commands:"),
+	})
 
-	case args.IsKube:
-		clikube.Exec()
-
-	case args.IsTaskFile:
-		clitaskfile.Exec()
-
-	case args.IsOptHelp:
-		util.PrintHelp(msgHelp, false)
-
-	default:
-		util.UnknownCommand(args.Command, "run 'sq --help' for more information")
-	}
+	arg.Watch("sq", helpMessage).
+		Add("docker", "", docker.CLI).
+		Add("kube", "", kube.CLI).
+		Add("taskfile", "", taskfile.CLI).
+		Add("version", "", func() { fmt.Printf("version %v\n", version) }).
+		Exec()
 }
