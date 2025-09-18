@@ -34,16 +34,9 @@ func (slf *stuWatch) Add(name string, alias string, callback func()) *stuWatch {
 }
 
 func (slf *stuWatch) Exec() {
-	var (
-		wi      *stuWatchItem
-		av      = Get()
-		isError = true
-	)
-
-	if av == "--help" {
-		util.PrintThenExit(slf.helpMessage)
-		return
-	}
+	var wi *stuWatchItem
+	av := Get()
+	Remove()
 
 	if av != "" {
 		for _, item := range slf.items {
@@ -60,18 +53,15 @@ func (slf *stuWatch) Exec() {
 	}
 
 	if wi != nil {
-		isError = false
-
-		if !isError {
-			Remove()
-		}
-	}
-
-	if isError {
-		help := fmt.Sprintf("run '%v --help' for more information", slf.currentPath)
-		util.UnknownCommand(Remains(), help)
+		wi.callback()
 		return
 	}
 
-	wi.callback()
+	if av == "--help" && Count() == 0 {
+		util.PrintThenExit(slf.helpMessage)
+		return
+	}
+
+	help := fmt.Sprintf("run '%v --help' for more information", slf.currentPath)
+	util.UnknownCommand(Remains(), help)
 }
