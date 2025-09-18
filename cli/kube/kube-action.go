@@ -95,11 +95,6 @@ usage: sq kube action
 
 	for _, key := range []string{"apply", "yml", "diff", "delete"} {
 		isCommand, index := arg.Search(key)
-		// if index != 0 {
-		// 	continue
-		// }
-
-		// arg.Remove(index)
 		if isCommand && index == 0 {
 			arg.Remove(index)
 
@@ -123,14 +118,22 @@ usage: sq kube action
 		}
 	}
 
-	isConf, index := arg.Search("conf")
-	arg.Remove(index)
-	if isConf {
-		if arg.Count() > 0 {
-			util.UnknownCommand(arg.Remains(), moreInfoMessage)
-		}
+	for _, key := range []string{"conf", "secret"} {
+		isCommand, index := arg.Search(key)
+		if isCommand && index == 0 {
+			arg.Remove(index)
 
-		execKubeActionConf(namespace, appName, ymls)
+			if arg.Count() > 0 {
+				util.UnknownCommand(arg.Remains(), moreInfoMessage)
+			}
+
+			switch key {
+			case "conf":
+				execKubeActionConf(namespace, appName, ymls)
+			case "secret":
+				execKubeActionSecret(namespace, appName)
+			}
+		}
 	}
 
 	isPods, index := arg.Search("pods")

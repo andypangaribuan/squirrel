@@ -15,10 +15,11 @@ import (
 	"squirrel/util"
 )
 
-func Watch(currentPath string, helpMessage string) *stuWatch {
+func Watch(currentPath string, helpMessage string, rootMessage string) *stuWatch {
 	return &stuWatch{
 		currentPath: currentPath,
 		helpMessage: helpMessage,
+		rootMessage: rootMessage,
 		items:       make([]*stuWatchItem, 0),
 	}
 }
@@ -57,9 +58,13 @@ func (slf *stuWatch) Exec() {
 		return
 	}
 
-	if av == "--help" && Count() == 0 {
-		util.PrintThenExit(slf.helpMessage)
-		return
+	if Count() == 0 {
+		switch {
+		case slf.helpMessage != "" && av == "--help":
+			util.PrintThenExit(slf.helpMessage)
+		case slf.rootMessage != "":
+			util.PrintThenExit(slf.rootMessage)
+		}
 	}
 
 	help := fmt.Sprintf("run '%v --help' for more information", slf.currentPath)

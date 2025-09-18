@@ -40,7 +40,7 @@ usage: sq
 		"commands": util.ColorBoldGreen("commands:"),
 	})
 
-	arg.Watch("sq", helpMessage).
+	arg.Watch("sq", helpMessage, helpMessage).
 		Add("docker", "", docker.CLI).
 		Add("kube", "", kube.CLI).
 		Add("taskfile", "", taskfile.CLI).

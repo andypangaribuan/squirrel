@@ -13,6 +13,7 @@ package arg
 type stuWatch struct {
 	currentPath string
 	helpMessage string
+	rootMessage string
 	items       []*stuWatchItem
 }
 

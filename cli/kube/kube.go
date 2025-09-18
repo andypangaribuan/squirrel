@@ -29,7 +29,7 @@ usage: sq kube
 		"commands": util.ColorBoldGreen("commands:"),
 	})
 
-	arg.Watch("sq kube", helpMessage).
+	arg.Watch("sq kube", helpMessage, helpMessage).
 		Add("pods", "", cliKubePods).
 		Add("action", "", cliKubeAction).
 		Exec()

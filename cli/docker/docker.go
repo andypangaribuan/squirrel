@@ -29,7 +29,7 @@ usage: sq docker
 		"commands": util.ColorBoldGreen("commands:"),
 	})
 
-	arg.Watch("sq docker", helpMessage).
+	arg.Watch("sq docker", helpMessage, helpMessage).
 		Add("ps", "", cliDockerPs).
 		Add("images", "", cliDockerImages).
 		Exec()
