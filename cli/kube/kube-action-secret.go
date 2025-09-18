@@ -57,9 +57,23 @@ func execKubeActionSecret(namespace string, appName string) {
 		}
 
 		lines := strings.Split(string(decodedBytes), "\n")
-		// for i, line := range lines {
-		// 	if
-		// }
+		for i, line := range lines {
+			if len(line) > 0 && line[:1] == "#" {
+				lines[i] = util.ColorCyan(line)
+				continue
+			}
+
+			ls := strings.Split(line, "=")
+			if len(ls) == 2 && util.ContainsOnlyAlphanumericAndUnderscore(ls[0]) {
+				lines[i] = util.ColorGreen(ls[0]) + util.ColorYellow("=")
+
+				if util.ContainsOnlyNumeric(ls[1]) {
+					lines[i] += util.ColorRed(ls[1])
+				} else {
+					lines[i] += ls[1]
+				}
+			}
+		}
 
 		out += strings.TrimSpace(strings.Join(lines, "\n"))
 	}

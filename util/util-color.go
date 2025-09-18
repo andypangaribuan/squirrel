@@ -20,6 +20,7 @@ func ColorGreen(text string) string {
 }
 
 var ColorBoldGreen = color.New(color.Bold, color.FgGreen).SprintFunc()
-var ColorBoldRed = color.New(color.Bold, color.FgRed).SprintFunc()
+var ColorBoldRed = color.New(color.Bold, color.FgHiRed).SprintFunc()
+var ColorRed = color.New(color.FgHiRed).SprintFunc()
 var ColorYellow = color.New(color.FgHiYellow).SprintFunc()
 var ColorCyan = color.New(color.FgHiCyan).SprintFunc()

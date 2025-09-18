@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -266,4 +267,17 @@ func addSpace(maxSize int, value string, rightAlign bool) string {
 func IsFileExists(filePath string) bool {
 	_, error := os.Stat(filePath)
 	return !errors.Is(error, os.ErrNotExist)
+}
+
+func ContainsOnlyAlphanumericAndUnderscore(s string) bool {
+	pattern := "^[a-zA-Z0-9_]*$"
+	re := regexp.MustCompile(pattern)
+	return re.MatchString(s)
+}
+
+
+func ContainsOnlyNumeric(s string) bool {
+	pattern := "^[0-9]*$"
+	re := regexp.MustCompile(pattern)
+	return re.MatchString(s)
 }
