@@ -25,15 +25,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type sshTunnel struct {
-	cfg      *stuTunnelConfig
-	client   *ssh.Client
-	listener net.Listener
-	stopOnce sync.Once
-	stopChan chan struct{}
-	doneChan chan error
-}
-
 func expandPath(path string) string {
 	if strings.HasPrefix(path, "~/") {
 		home, _ := os.UserHomeDir()
@@ -125,6 +116,7 @@ func (t *sshTunnel) run() {
 				default:
 					errChan <- err
 				}
+
 				return
 			}
 
@@ -183,6 +175,7 @@ func (t *sshTunnel) handleConnection(localConn net.Conn) {
 		_, _ = io.Copy(localConn, remoteConn)
 		done <- struct{}{}
 	}()
+
 	go func() {
 		_, _ = io.Copy(remoteConn, localConn)
 		done <- struct{}{}
@@ -237,7 +230,6 @@ func dialWithProxy(proxyCmd, user, addr string) (net.Conn, error) {
 	cmdStr := strings.ReplaceAll(proxyCmd, "%h", host)
 	cmdStr = strings.ReplaceAll(cmdStr, "%p", port)
 	cmdStr = strings.ReplaceAll(cmdStr, "%r", user)
-
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 
 	stdin, err := cmd.StdinPipe()
@@ -254,26 +246,9 @@ func dialWithProxy(proxyCmd, user, addr string) (net.Conn, error) {
 		return nil, err
 	}
 
-	return &proxyConn{
+	return &stuProxyConn{
 		Writer: stdin,
 		Reader: stdout,
 		cmd:    cmd,
 	}, nil
 }
-
-type proxyConn struct {
-	io.Writer
-	io.Reader
-	cmd *exec.Cmd
-}
-
-func (p *proxyConn) Close() error {
-	_ = p.cmd.Process.Kill()
-	return p.cmd.Wait()
-}
-
-func (p *proxyConn) LocalAddr() net.Addr                { return &net.TCPAddr{} }
-func (p *proxyConn) RemoteAddr() net.Addr               { return &net.TCPAddr{} }
-func (p *proxyConn) SetDeadline(t time.Time) error      { return nil }
-func (p *proxyConn) SetReadDeadline(t time.Time) error  { return nil }
-func (p *proxyConn) SetWriteDeadline(t time.Time) error { return nil }

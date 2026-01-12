@@ -11,6 +11,7 @@
 package tunnel
 
 import (
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,11 +25,11 @@ func tick() tea.Cmd {
 
 func calculateMaxLengths(tunnels []stuTunnelConfig) (int, int) {
 	maxN, maxP := 0, 0
-
 	for _, t := range tunnels {
 		if len(t.Name) > maxN {
 			maxN = len(t.Name)
 		}
+
 		if len(t.LocalPort) > maxP {
 			maxP = len(t.LocalPort)
 		}
@@ -39,4 +40,26 @@ func calculateMaxLengths(tunnels []stuTunnelConfig) (int, int) {
 	}
 
 	return maxN, maxP
+}
+
+func filterTunnels(tunnels []stuTunnelConfig, sshMode bool) []stuTunnelConfig {
+	var filtered []stuTunnelConfig
+	for _, t := range tunnels {
+		actions := t.Actions
+		if actions == "" {
+			actions = "tunnel"
+		}
+
+		if sshMode {
+			if strings.Contains(actions, "ssh") {
+				filtered = append(filtered, t)
+			}
+		} else {
+			if strings.Contains(actions, "tunnel") {
+				filtered = append(filtered, t)
+			}
+		}
+	}
+
+	return filtered
 }

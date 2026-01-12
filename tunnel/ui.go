@@ -13,7 +13,9 @@ package tunnel
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -23,18 +25,21 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-func interactiveMenu() {
+func interactiveMenu(sshMode bool) {
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	maxN, maxP := calculateMaxLengths(cfg.Tunnels)
+	filteredTunnels := filterTunnels(cfg.Tunnels, sshMode)
+	maxN, maxP := calculateMaxLengths(filteredTunnels)
+
 	var items []list.Item
-	for _, t := range cfg.Tunnels {
-		items = append(items, tunnelItem{
+	for _, t := range filteredTunnels {
+		items = append(items, stuTunnelItem{
 			config:     t,
 			running:    isTunnelRunning(t.PID),
+			sshMode:    sshMode,
 			maxNameLen: maxN,
 			maxPortLen: maxP,
 		})
@@ -46,7 +51,12 @@ func interactiveMenu() {
 	d.SetSpacing(0)
 
 	l := list.New(items, d, 0, 0)
-	l.Title = "SSH Tunnels"
+	if sshMode {
+		l.Title = "SSH Access"
+	} else {
+		l.Title = "SSH Tunnels"
+	}
+
 	l.SetShowTitle(true)
 	l.SetShowStatusBar(false)
 	l.SetShowHelp(false)
@@ -62,15 +72,29 @@ func interactiveMenu() {
 		return []key.Binding{addKey, stopAllKey}
 	}
 
-	m := itemModel{
-		list:  l,
-		state: stateList,
+	m := stuItemModel{
+		sshMode: sshMode,
+		list:    l,
+		state:   stateList,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	finalM, err := p.Run()
+	if err != nil {
 		fmt.Printf("Error running program: %v\n", err)
 		os.Exit(1)
+	}
+
+	if finalModel, ok := finalM.(stuItemModel); ok && finalModel.pendingCmd != nil {
+		cmd := finalModel.pendingCmd
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("SSH session ended with error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -95,6 +119,7 @@ func stopTunnelLogic(name string) {
 	if t.PID > 0 {
 		_ = stopTunnel(t.PID)
 	}
+
 	_ = killWatchdogByName(name)
 
 	if t.LocalPort != "" {
@@ -135,8 +160,55 @@ func stopAllTunnelsLogic() {
 	_ = os.WriteFile(logPath, []byte(""), 0644)
 }
 
+func buildSshCmd(t stuTunnelConfig) *exec.Cmd {
+	user, addr := parseHost(t.Host)
+
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+		port = "22"
+	}
+
+	args := []string{}
+
+	if t.IdentityFile != "" {
+		args = append(args, "-i", expandPath(t.IdentityFile))
+	}
+
+	if t.ProxyCommand != "" {
+		args = append(args, "-o", fmt.Sprintf("ProxyCommand=%s", t.ProxyCommand))
+	}
+
+	args = append(args, "-o StrictHostKeyChecking=no")
+	args = append(args, "-o UserKnownHostsFile=/dev/null")
+	args = append(args, "-o LogLevel=ERROR")
+
+	if port != "22" {
+		args = append(args, "-p", port)
+	}
+
+	target := host
+	if user != "" {
+		target = fmt.Sprintf("%s@%s", user, host)
+	}
+
+	args = append(args, target)
+
+	if t.Password != "" {
+		exe, err := os.Executable()
+		if err == nil {
+			return exec.Command(exe, "access", t.Name)
+		}
+
+		log.Printf("Failed to get executable path: %v", err)
+	}
+
+	return exec.Command("ssh", args...)
+}
+
 func deleteTunnelLogic(name string) {
 	var confirm bool
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -154,7 +226,6 @@ func deleteTunnelLogic(name string) {
 		if t.PID > 0 {
 			_ = stopTunnel(t.PID)
 		}
-
 		if t.LocalPort != "" {
 			portPid := getPidByPort(t.LocalPort)
 			if portPid > 0 && portPid != os.Getpid() {
@@ -179,7 +250,7 @@ func addTunnelLogic() {
 			huh.NewInput().Title("Identity File (optional):").Value(&identity),
 			huh.NewInput().Title("Proxy Command (optional):").Value(&proxy),
 			huh.NewInput().Title("Remote Address:Port:").Value(&remote),
-			huh.NewInput().Title("Local Port:").Value(&local),
+			huh.NewInput().Title("Local Port (optional):").Value(&local),
 		),
 	)
 
@@ -187,8 +258,8 @@ func addTunnelLogic() {
 		return
 	}
 
-	if name == "" || host == "" || remote == "" || local == "" {
-		fmt.Println("Error: Name, Host, Remote Address, and Local Port are required.")
+	if name == "" || host == "" || remote == "" {
+		fmt.Println("Error: Name, Host, and Remote Address are required.")
 		time.Sleep(2 * time.Second)
 		return
 	}
@@ -235,7 +306,7 @@ func updateTunnelLogic(name string) {
 			huh.NewInput().Title("Identity File:").Value(&identity),
 			huh.NewInput().Title("Proxy Command:").Value(&proxy),
 			huh.NewInput().Title("Remote Address:Port:").Value(&remote),
-			huh.NewInput().Title("Local Port:").Value(&local),
+			huh.NewInput().Title("Local Port (optional):").Value(&local),
 		),
 	)
 
@@ -264,11 +335,12 @@ func updateTunnelLogic(name string) {
 
 	t.IdentityFile = identity
 	t.ProxyCommand = proxy
+
 	if remote != "" {
 		t.RemoteAddr = remote
 	}
 
-	if local != "" {
+	if local != t.LocalPort {
 		t.LocalPort = local
 	}
 

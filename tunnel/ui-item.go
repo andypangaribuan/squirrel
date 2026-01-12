@@ -16,10 +16,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (i tunnelItem) Description() string { return "" }
-func (i tunnelItem) FilterValue() string { return i.config.Name }
+func (i stuTunnelItem) Description() string { return "" }
+func (i stuTunnelItem) FilterValue() string { return i.config.Name }
 
-func (i tunnelItem) Title() string {
+func (i stuTunnelItem) Title() string {
 	var status string
 	var style lipgloss.Style
 
@@ -31,20 +31,22 @@ func (i tunnelItem) Title() string {
 		switch status {
 		case "connected":
 			style = runningStyle
-
 		case "disconnected", "disconnected-ready":
 			status = "disconnected"
 			style = errorStyle
-
 		case "reconnecting":
 			style = pendingStyle
-
 		default:
 			style = runningStyle
 		}
 	}
 
+	if i.sshMode {
+		return i.config.Name
+	}
+
 	namePart := fmt.Sprintf(fmt.Sprintf("%%-%ds", i.maxNameLen), i.config.Name)
 	portPart := fmt.Sprintf(fmt.Sprintf("%%%ds", i.maxPortLen), i.config.LocalPort)
+
 	return fmt.Sprintf("%s     %s   %s", namePart, portPart, style.Render(status))
 }

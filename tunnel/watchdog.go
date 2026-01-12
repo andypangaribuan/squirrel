@@ -37,6 +37,7 @@ func runWorker(name string) {
 			log.Printf("Worker [%s]: Failed to load config for status update (attempt %d): %v", name, i+1, err)
 			time.Sleep(100 * time.Millisecond)
 		}
+
 		log.Printf("Worker [%s]: Failed to update status after retries.", name)
 	}
 
@@ -94,6 +95,7 @@ func runWatchdog(name string) {
 		defer func() {
 			_ = f.Close()
 		}()
+
 		log.SetOutput(f)
 	}
 
@@ -117,7 +119,6 @@ func runWatchdog(name string) {
 		if currentWorker != nil && currentWorker.Process != nil {
 			_ = currentWorker.Process.Signal(syscall.SIGTERM)
 		}
-
 		mu.Unlock()
 
 		cfg, _ := loadConfig()
@@ -126,7 +127,6 @@ func runWatchdog(name string) {
 			t.SshPid = 0
 			t.Status = ""
 		})
-
 		os.Exit(0)
 	}()
 

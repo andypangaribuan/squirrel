@@ -18,23 +18,6 @@ import (
 	"syscall"
 )
 
-type stuTunnelConfig struct {
-	Name         string `json:"name"`
-	Host         string `json:"host"`
-	Password     string `json:"password,omitempty"`
-	IdentityFile string `json:"identity_file,omitempty"`
-	ProxyCommand string `json:"proxy_command,omitempty"`
-	RemoteAddr   string `json:"remote_addr"`
-	LocalPort    string `json:"local_port"`
-	PID          int    `json:"pid,omitempty"`
-	SshPid       int    `json:"ssh_pid,omitempty"`
-	Status       string `json:"status,omitempty"`
-}
-
-type stuConfig struct {
-	Tunnels []stuTunnelConfig `json:"tunnels"`
-}
-
 func getConfigPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "squirrel", "tunnel.json")
@@ -116,6 +99,7 @@ func (c *stuConfig) addTunnel(t stuTunnelConfig) error {
 			return fmt.Errorf("tunnel with name %s already exists", t.Name)
 		}
 	}
+
 	latest.Tunnels = append(latest.Tunnels, t)
 	return saveConfig(latest)
 }
@@ -146,9 +130,11 @@ func (c *stuConfig) renameTunnel(oldName string, t stuTunnelConfig) error {
 			break
 		}
 	}
+
 	if !found {
 		return fmt.Errorf("tunnel with name %s not found", oldName)
 	}
+
 	return saveConfig(latest)
 }
 

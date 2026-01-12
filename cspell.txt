@@ -22,3 +22,5 @@ ymls
 statefulset
 pids
 pgrep
+ISPEED
+OSPEED

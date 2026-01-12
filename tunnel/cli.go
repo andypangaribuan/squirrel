@@ -17,6 +17,12 @@ func CLI() {
 	arg.Remove(0)
 
 	switch opt {
+	case "access":
+		name := arg.Get()
+		if name != "" {
+			runAccess(name)
+		}
+
 	case "watchdog":
 		name := arg.Get()
 		if name != "" {
@@ -30,6 +36,6 @@ func CLI() {
 		}
 
 	default:
-		interactiveMenu()
+		interactiveMenu(opt == "--ssh")
 	}
 }

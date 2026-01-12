@@ -12,18 +12,20 @@ package tunnel
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m itemModel) Init() tea.Cmd {
+func (m stuItemModel) Init() tea.Cmd {
 	return tick()
 }
 
-func (m *itemModel) ResizeList() {
+func (m *stuItemModel) ResizeList() {
 	h, v := docStyle.GetFrameSize()
 	if m.list.Help.ShowAll {
 		m.list.SetSize(m.lastWidth-h, m.lastHeight-v)
@@ -32,7 +34,7 @@ func (m *itemModel) ResizeList() {
 	}
 }
 
-func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m stuItemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		key := msg.String()
@@ -43,7 +45,8 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.list.FilterState() == list.Filtering {
 					m.list.Update(msg)
 				}
-				if item, ok := m.list.SelectedItem().(tunnelItem); ok {
+
+				if item, ok := m.list.SelectedItem().(stuTunnelItem); ok {
 					m.selected = item
 					m.state = stateActions
 					m.actionChoice = 0
@@ -56,7 +59,7 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateForm
 				return m, tea.ExecProcess(exec.Command("clear"), func(err error) tea.Msg {
 					addTunnelLogic()
-					return formFinishedMsg{}
+					return stuFormFinishedMsg{}
 				})
 			}
 
@@ -89,14 +92,17 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c", "esc", "q":
 				m.state = stateList
 				return m, nil
+
 			case "up", "k":
 				if m.actionChoice > 0 {
 					m.actionChoice--
 				}
+
 			case "down", "j":
 				if m.actionChoice < len(m.actions)-1 {
 					m.actionChoice++
 				}
+
 			case "enter":
 				action := m.actions[m.actionChoice]
 				return m.handleAction(action)
@@ -109,14 +115,15 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ResizeList()
 		return m, nil
 
-	case formFinishedMsg:
+	case stuFormFinishedMsg:
 		m.state = stateList
 		return m, nil
 
 	case tickMsg:
 		cfg, err := loadConfig()
 		if err == nil {
-			maxN, maxP := calculateMaxLengths(cfg.Tunnels)
+			filteredTunnels := filterTunnels(cfg.Tunnels, m.sshMode)
+			maxN, maxP := calculateMaxLengths(filteredTunnels)
 
 			if m.state == stateActions {
 				if t, found := cfg.getTunnel(m.selected.config.Name); found {
@@ -124,31 +131,31 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					displayStatus := syncStatus(t.Name, isRunning, t.Status, t.LocalPort)
 
 					t.Status = displayStatus
-					m.selected = tunnelItem{config: t, running: isRunning, maxNameLen: maxN, maxPortLen: maxP}
+					m.selected = stuTunnelItem{config: t, running: isRunning, sshMode: m.sshMode, maxNameLen: maxN, maxPortLen: maxP}
 					m.updateActions()
 				}
 			}
 
 			if m.state == stateList {
 				var selectedName string
-				if item, ok := m.list.SelectedItem().(tunnelItem); ok {
+				if item, ok := m.list.SelectedItem().(stuTunnelItem); ok {
 					selectedName = item.config.Name
 				}
 
 				var currentItems []list.Item
-				for _, t := range cfg.Tunnels {
+				for _, t := range filteredTunnels {
 					isRunning := isTunnelRunning(t.PID)
 					displayStatus := syncStatus(t.Name, isRunning, t.Status, t.LocalPort)
 
 					t.Status = displayStatus
-					item := tunnelItem{config: t, running: isRunning, maxNameLen: maxN, maxPortLen: maxP}
+					item := stuTunnelItem{config: t, running: isRunning, sshMode: m.sshMode, maxNameLen: maxN, maxPortLen: maxP}
 					currentItems = append(currentItems, item)
 				}
 				m.list.SetItems(currentItems)
 
 				if selectedName != "" {
 					for i, item := range m.list.Items() {
-						if ti, ok := item.(tunnelItem); ok && ti.config.Name == selectedName {
+						if ti, ok := item.(stuTunnelItem); ok && ti.config.Name == selectedName {
 							m.list.Select(i)
 							break
 						}
@@ -156,6 +163,7 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+
 		return m, tick()
 	}
 
@@ -168,7 +176,7 @@ func (m itemModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m itemModel) View() string {
+func (m stuItemModel) View() string {
 	if m.quitting || m.state == stateForm {
 		return ""
 	}
@@ -193,7 +201,13 @@ func (m itemModel) View() string {
 			}
 		}
 
-		s := fmt.Sprintf("\n  --- Tunnel: %s %s ---\n\n", m.selected.config.Name, statusLine)
+		s := ""
+		if m.sshMode {
+			s += "\n"
+		} else {
+			s += fmt.Sprintf("\n  --- Tunnel: %s %s ---\n\n", m.selected.config.Name, statusLine)
+		}
+
 		for i, action := range m.actions {
 			cursor := "  "
 			style := lipgloss.NewStyle()
@@ -203,6 +217,7 @@ func (m itemModel) View() string {
 			}
 			s += fmt.Sprintf("  %s%s\n", cursor, style.Render(action))
 		}
+
 		s += "\n  (esc to go back)\n"
 		return docStyle.Render(s)
 	}
@@ -214,20 +229,40 @@ func (m itemModel) View() string {
 	return docStyle.Render(m.list.View() + "\n\n  " + lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("↑↓ • . stop all • / filter • q quit • ? more"))
 }
 
-func (m *itemModel) updateActions() {
-	if m.selected.running {
-		m.actions = []string{"Stop", "Update", "Delete"}
-	} else {
-		m.actions = []string{"Start", "Update", "Delete"}
+func (m *stuItemModel) updateActions() {
+	m.actions = make([]string, 0)
+	if !m.sshMode && strings.Contains(m.selected.config.Actions, "tunnel") && m.selected.config.LocalPort != "" {
+		if m.selected.running {
+			m.actions = append(m.actions, "Stop")
+		} else {
+			m.actions = append(m.actions, "Start")
+		}
 	}
+
+	if m.sshMode && strings.Contains(m.selected.config.Actions, "ssh") {
+		m.actions = append(m.actions, "Access")
+	}
+
+	m.actions = append(m.actions, "Update", "Delete")
+
 	if m.actionChoice >= len(m.actions) {
 		m.actionChoice = 0
 	}
 }
 
-func (m itemModel) handleAction(action string) (tea.Model, tea.Cmd) {
+func (m stuItemModel) handleAction(action string) (tea.Model, tea.Cmd) {
 	name := m.selected.config.Name
+
 	switch action {
+	case "Access":
+		cmd := buildSshCmd(m.selected.config)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		m.pendingCmd = cmd
+		return m, tea.Quit
+
 	case "Start":
 		startTunnelLogic(name)
 		m.state = stateList
@@ -242,14 +277,14 @@ func (m itemModel) handleAction(action string) (tea.Model, tea.Cmd) {
 		m.state = stateForm
 		return m, tea.ExecProcess(exec.Command("clear"), func(err error) tea.Msg {
 			deleteTunnelLogic(name)
-			return formFinishedMsg{}
+			return stuFormFinishedMsg{}
 		})
 
 	case "Update":
 		m.state = stateForm
 		return m, tea.ExecProcess(exec.Command("clear"), func(err error) tea.Msg {
 			updateTunnelLogic(name)
-			return formFinishedMsg{}
+			return stuFormFinishedMsg{}
 		})
 	}
 	return m, nil

@@ -22,7 +22,7 @@
       //   "pods",
       //   "events"
       // ]
-      "args": ["tunnel", "watchdog", "s2"]
+      "args": ["tunnel", "--ssh"]
     }
   ]
 }
