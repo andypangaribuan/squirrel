@@ -16,6 +16,22 @@ sudo chmod +x /usr/local/bin/sq
 sq --help
 ```
 
+## Debian dependencies
+
+```sh
+sudo apt update
+sudo apt install -y \
+  libx11-dev \
+  libxtst-dev \
+  libxinerama-dev \
+  libxrandr-dev \
+  libxcursor-dev \
+  libxdamage-dev \
+  libxcomposite-dev \
+  libxkbcommon-dev \
+  libxkbcommon-x11-dev
+```
+
 ## Third party package
 
 This sq cli using 3rd party package, you can install using brew:
