@@ -5,6 +5,12 @@ wissance
 fatih
 goterminal
 apoorvam
+robotgo
+charmbracelet
+lipgloss
+sshpass
+bubbletea
+chans
 
 
 MINPODS

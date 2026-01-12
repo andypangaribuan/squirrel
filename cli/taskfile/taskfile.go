@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"squirrel/arg"
 	"squirrel/util"
+	"strings"
 
 	"github.com/wissance/stringFormatter"
 )
@@ -25,13 +26,13 @@ info : execute taskfile cli
 usage: sq taskfile
 
 {options}
-  --file   [+value] path of .taskfile (default current directory)
+  --file   [+value|csv] path of .taskfile (default current directory)
 `, map[string]any{})
 
 	isOptHelp, index := arg.Search("--help")
 	arg.Remove(index)
 
-	filePath := arg.GetOptValue(moreInfoMessage, "--file")
+	filePaths := arg.GetOptValue(moreInfoMessage, "--file")
 
 	if arg.Count() > 0 {
 		util.UnknownCommand(arg.Remains(), moreInfoMessage)
@@ -41,25 +42,37 @@ usage: sq taskfile
 		util.PrintThenExit(helpMessage)
 	}
 
-	execTaskfile(filePath)
+	execTaskfile(strings.Split(filePaths, ","))
 }
 
-func execTaskfile(filePath string) {
+func execTaskfile(ls []string) {
 	var (
-		filePaths = []string{fmt.Sprintf("%v/.taskfile", getWorkingDirectory())}
+		filePaths = make([]string, 0)
 		model     = &stuTaskfile{
 			items:            make([][]any, 0),
 			newLineAtIndexes: make([]int, 0),
 		}
 	)
 
-	if filePath != "" {
-		filePaths = append(filePaths, filePath)
+	currentDotTaskfile := fmt.Sprintf("%v/.taskfile", getWorkingDirectory())
+	if util.IsFileExists(currentDotTaskfile) {
+		filePaths = append(filePaths, currentDotTaskfile)
+	}
+
+	for _, path := range ls {
+		if util.IsFileExists(path) {
+			filePaths = append(filePaths, path)
+		}
+	}
+
+	if len(filePaths) == 0 {
+		return
 	}
 
 	for _, filePath := range filePaths {
 		err := fileOutput(filePath, model)
 		if err != nil {
+			fmt.Printf("error: %+v\n", err)
 			return
 		}
 	}

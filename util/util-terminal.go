@@ -16,8 +16,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/andypangaribuan/gmod/fm"
 )
 
 func Terminal(workingDirectory string, script string, args ...any) (out string, err *string) {
@@ -45,20 +43,12 @@ func execTerminal(withZshrc bool, workingDirectory string, script string, args .
 	cmd := exec.Command("bash", "-c", script)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	er := cmd.Run()
-	if er != nil {
-		v := fmt.Sprintf("%+v\n", err)
-		err = &v
-	}
+	_ = cmd.Run()
 
 	out = stdout.String()
 	outErr := strings.TrimSpace(stderr.String())
 	if outErr != "" {
-		if err == nil {
-			err = &outErr
-		} else {
-			err = fm.Ptr(outErr + "\n" + *err)
-		}
+		err = &outErr
 	}
 
 	return

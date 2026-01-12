@@ -30,11 +30,41 @@ EOF`, lines)
 	}
 
 	out = strings.TrimSpace(out)
-	if len(strings.Split(out, "\n")) == 1 {
-		if out != "" {
-			fmt.Println(out)
+	var (
+		ls    = strings.Split(out, "\n")
+		count = len(ls)
+		rm    = []string{
+			"diff -u -N /var/folders/rn/",
+			"--- /var/folders/rn/",
+			"+++ /var/folders/rn/",
+			"@@ ",
 		}
-	} else {
-		fmt.Println(out + "\n")
+	)
+
+	for i := 0; i < count; i++ {
+		line := ls[i]
+		isContinue := false
+
+		for _, r := range rm {
+			if len(line) > len(r) && line[:len(r)] == r {
+				ls = append(ls[:i], ls[i+1:]...)
+				isContinue = true
+				i--
+				count--
+				break
+			}
+		}
+
+		if isContinue {
+			continue
+		}
+	}
+
+	if len(ls) > 0 && ls[0] != "" {
+		if len(ls) == 1 {
+			fmt.Println(ls[0])
+		} else {
+			fmt.Println(strings.Join(ls, "\n") + "\n")
+		}
 	}
 }

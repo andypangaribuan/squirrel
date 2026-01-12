@@ -14,15 +14,17 @@ import (
 	"fmt"
 	"squirrel/arg"
 	"squirrel/cli/docker"
+	"squirrel/cli/ext"
 	"squirrel/cli/kube"
 	"squirrel/cli/taskfile"
+	"squirrel/tunnel"
 	"squirrel/util"
 
 	_ "github.com/andypangaribuan/gmod"
 	"github.com/wissance/stringFormatter"
 )
 
-const version = "2.0.1"
+const version = "2.0.3"
 
 func main() {
 	util.ExitWithCtrlC()
@@ -35,6 +37,8 @@ usage: sq
   docker     execute docker cli
   kube       execute kubectl cli
   taskfile   execute taskfile cli
+  tunnel     manage ssh tunnels
+  ext        execute ext cli
   version    print sq-cli version
 `, map[string]any{
 		"commands": util.ColorBoldGreen("commands:"),
@@ -44,6 +48,8 @@ usage: sq
 		Add("docker", "", docker.CLI).
 		Add("kube", "", kube.CLI).
 		Add("taskfile", "", taskfile.CLI).
+		Add("tunnel", "", tunnel.CLI).
+		Add("ext", "", ext.CLI).
 		Add("version", "", func() { fmt.Printf("version %v\n", version) }).
 		Exec()
 }

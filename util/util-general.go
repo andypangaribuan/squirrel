@@ -275,7 +275,6 @@ func ContainsOnlyAlphanumericAndUnderscore(s string) bool {
 	return re.MatchString(s)
 }
 
-
 func ContainsOnlyNumeric(s string) bool {
 	pattern := "^[0-9]*$"
 	re := regexp.MustCompile(pattern)

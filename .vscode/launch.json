@@ -7,20 +7,22 @@
       "request": "launch",
       "mode": "debug",
       "program": "main.go",
+      "console": "integratedTerminal",
       // "args": ["--help"]
       // "args": ["version"]
       // "args": ["docker"]
       // "args": ["docker", "images", "--contains=php", "--order=tag"]
       // "args": ["kube", "pods", "-n=ns-stg", "asset-service", "bridge-api"]
-      "args": [
-        "kube",
-        "action",
-        "--namespace=ns-stg",
-        "--app=user-kyc-api",
-        "--yml=sa,secret,dep,pdb,hpa,svc,ing",
-        "pods",
-        "events"
-      ]
+      // "args": [
+      //   "kube",
+      //   "action",
+      //   "--namespace=ns-stg",
+      //   "--app=user-kyc-api",
+      //   "--yml=sa,secret,dep,pdb,hpa,svc,ing",
+      //   "pods",
+      //   "events"
+      // ]
+      "args": ["tunnel", "watchdog", "s2"]
     }
   ]
 }
