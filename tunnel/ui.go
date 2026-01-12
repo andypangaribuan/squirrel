@@ -133,7 +133,7 @@ func stopAllTunnelsLogic() {
 	}
 
 	home, _ := os.UserHomeDir()
-	logPath := filepath.Join(home, ".config", "core-tunnel", "watchdog.log")
+	logPath := filepath.Join(home, ".config", "squirrel", "tunnel.log")
 	_ = os.WriteFile(logPath, []byte(""), 0644)
 }
 

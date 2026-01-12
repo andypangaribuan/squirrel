@@ -66,7 +66,7 @@ func runWorker(name string) {
 
 func runWatchdog(name string) {
 	home, _ := os.UserHomeDir()
-	logPath := filepath.Join(home, ".config", "core-tunnel", "watchdog.log")
+	logPath := filepath.Join(home, ".config", "squirrel", "tunnel.log")
 	_ = os.MkdirAll(filepath.Dir(logPath), 0755)
 
 	f, _ := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

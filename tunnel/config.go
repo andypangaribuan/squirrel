@@ -37,7 +37,7 @@ type stuConfig struct {
 
 func getConfigPath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "core-tunnel", "config.json")
+	return filepath.Join(home, ".config", "squirrel", "tunnel.json")
 }
 
 func loadConfig() (*stuConfig, error) {
