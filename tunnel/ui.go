@@ -80,6 +80,7 @@ func startTunnelLogic(name string) {
 	if isTunnelRunning(t.PID) {
 		return
 	}
+
 	pid, err := startWatchdog(name)
 	if err == nil {
 		t.PID = pid
@@ -91,12 +92,11 @@ func stopTunnelLogic(name string) {
 	cfg, _ := loadConfig()
 	t, _ := cfg.getTunnel(name)
 
-	// 1. Try to stop the known watchdog PID
 	if t.PID > 0 {
 		_ = stopTunnel(t.PID)
 	}
+	_ = killWatchdogByName(name)
 
-	// 2. Also check if anything else is currently using the local port
 	if t.LocalPort != "" {
 		portPid := getPidByPort(t.LocalPort)
 		if portPid > 0 && portPid != os.Getpid() {
@@ -113,12 +113,10 @@ func stopTunnelLogic(name string) {
 func stopAllTunnelsLogic() {
 	cfg, _ := loadConfig()
 	for _, t := range cfg.Tunnels {
-		// Stop by PID
 		if t.PID > 0 {
 			_ = stopTunnel(t.PID)
 		}
 
-		// Stop by Port
 		if t.LocalPort != "" {
 			portPid := getPidByPort(t.LocalPort)
 			if portPid > 0 && portPid != os.Getpid() {
@@ -146,6 +144,7 @@ func deleteTunnelLogic(name string) {
 				Value(&confirm),
 		),
 	)
+
 	if err := form.Run(); err != nil || !confirm {
 		return
 	}
@@ -155,6 +154,7 @@ func deleteTunnelLogic(name string) {
 		if t.PID > 0 {
 			_ = stopTunnel(t.PID)
 		}
+
 		if t.LocalPort != "" {
 			portPid := getPidByPort(t.LocalPort)
 			if portPid > 0 && portPid != os.Getpid() {
@@ -162,6 +162,7 @@ func deleteTunnelLogic(name string) {
 			}
 		}
 	}
+
 	_ = cfg.deleteTunnel(name)
 	fmt.Printf("Tunnel '%s' deleted.\n", name)
 	time.Sleep(500 * time.Millisecond)
@@ -252,17 +253,21 @@ func updateTunnelLogic(name string) {
 	if currentName != "" {
 		t.Name = currentName
 	}
+
 	if host != "" {
 		t.Host = host
 	}
+
 	if pass != "" {
 		t.Password = pass
 	}
+
 	t.IdentityFile = identity
 	t.ProxyCommand = proxy
 	if remote != "" {
 		t.RemoteAddr = remote
 	}
+
 	if local != "" {
 		t.LocalPort = local
 	}
@@ -273,5 +278,6 @@ func updateTunnelLogic(name string) {
 	} else {
 		fmt.Printf("Tunnel '%s' updated successfully.\n", t.Name)
 	}
+
 	time.Sleep(500 * time.Millisecond)
 }

@@ -20,3 +20,5 @@ MAXPODS
 KYML
 ymls
 statefulset
+pids
+pgrep

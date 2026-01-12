@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,15 @@ type sshTunnel struct {
 	doneChan chan error
 }
 
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, path[2:])
+	}
+
+	return path
+}
+
 func startSSHTunnelGo(cfg *stuTunnelConfig) (*sshTunnel, error) {
 	user, addr := parseHost(cfg.Host)
 
@@ -42,14 +52,17 @@ func startSSHTunnelGo(cfg *stuTunnelConfig) (*sshTunnel, error) {
 	}
 
 	if cfg.IdentityFile != "" {
-		key, err := os.ReadFile(cfg.IdentityFile)
+		keyPath := expandPath(cfg.IdentityFile)
+		key, err := os.ReadFile(keyPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read identity file: %w", err)
 		}
+
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
+
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
@@ -123,7 +136,6 @@ func (t *sshTunnel) run() {
 		}
 	}()
 
-	// Keepalive goroutine or block until error/stop
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -134,13 +146,14 @@ func (t *sshTunnel) run() {
 			wg.Wait()
 			t.doneChan <- nil
 			return
+
 		case err := <-errChan:
 			t.cleanup()
 			wg.Wait()
 			t.doneChan <- err
 			return
+
 		case <-ticker.C:
-			// Send a keepalive request
 			_, _, err := t.client.SendRequest("keepalive@openssh.com", true, nil)
 			if err != nil {
 				t.cleanup()
@@ -211,27 +224,27 @@ func parseHost(host string) (username, addr string) {
 		username = host[:i]
 		addr = host[i+1:]
 	}
+
 	if !strings.Contains(addr, ":") {
 		addr = addr + ":22"
 	}
+
 	return
 }
 
 func dialWithProxy(proxyCmd, user, addr string) (net.Conn, error) {
-	// Replace %h and %p in proxy command
 	host, port, _ := net.SplitHostPort(addr)
 	cmdStr := strings.ReplaceAll(proxyCmd, "%h", host)
 	cmdStr = strings.ReplaceAll(cmdStr, "%p", port)
 	cmdStr = strings.ReplaceAll(cmdStr, "%r", user)
 
-	// We use /bin/sh -c to run the proxy command to support pipes/etc
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 
-	// Create pipes for communication
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

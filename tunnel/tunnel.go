@@ -11,6 +11,7 @@
 package tunnel
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ func isPortOpen(port string) bool {
 	if err != nil {
 		return false
 	}
+
 	_ = conn.Close()
 	return true
 }
@@ -36,6 +38,7 @@ func getPidByPort(port string) int {
 	if pidStr == "" {
 		return 0
 	}
+
 	lines := strings.Split(pidStr, "\n")
 	for _, line := range lines {
 		pid, _ := strconv.Atoi(line)
@@ -43,6 +46,7 @@ func getPidByPort(port string) int {
 			return pid
 		}
 	}
+
 	return 0
 }
 
@@ -53,7 +57,6 @@ func startWorker(name string) (*exec.Cmd, error) {
 	}
 
 	cmd := exec.Command(exe, "tunnel", "worker", name)
-	// We don't setsid here because the watchdog will manage this process
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -88,6 +91,25 @@ func startWatchdog(name string) (int, error) {
 	return cmd.Process.Pid, nil
 }
 
+func killWatchdogByName(name string) error {
+	cmd := exec.Command("pgrep", "-f", fmt.Sprintf("tunnel watchdog %s", name))
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	pids := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for pidStr := range pids {
+		if pid, err := strconv.Atoi(pidStr); err == nil && pid > 0 {
+			if pid != os.Getpid() {
+				_ = stopTunnel(pid)
+			}
+		}
+	}
+
+	return nil
+}
+
 func stopTunnel(pid int) error {
 	if pid <= 0 {
 		return nil
@@ -98,35 +120,39 @@ func stopTunnel(pid int) error {
 		return nil
 	}
 
-	err = process.Signal(syscall.Signal(0))
-	if err != nil {
-		return nil // Already dead
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		return nil
 	}
 
-	return process.Signal(syscall.SIGTERM)
+	for range 10 {
+		time.Sleep(100 * time.Millisecond)
+		if err := process.Signal(syscall.Signal(0)); err != nil {
+			return nil
+		}
+	}
+
+	return process.Signal(syscall.SIGKILL)
 }
 
 func isTunnelRunning(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
+
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return false
 	}
 
-	// Double check if the process is actually alive
 	err = process.Signal(syscall.Signal(0))
 	if err != nil {
 		return false
 	}
 
-	// On macOS/Linux, verify this is actually our watchdog process
-	// This prevents issues with PID reuse.
 	cmd := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "command=")
 	output, err := cmd.Output()
 	if err != nil {
-		return true // Fallback to PID check if ps fails
+		return true
 	}
 
 	cmdLine := string(output)
@@ -136,10 +162,7 @@ func isTunnelRunning(pid int) bool {
 func syncStatus(name string, isRunning bool, currentStatus string, localPort string) string {
 	displayStatus := currentStatus
 
-	// 1. If the watchdog is NOT running, but it was supposedly active.
 	if !isRunning && currentStatus != "" {
-		// If it's already "disconnected-ready", it means we've shown "disconnected" for at least one tick.
-		// Now we try to restart the watchdog.
 		if currentStatus == "disconnected-ready" {
 			newPid, err := startWatchdog(name)
 			if err == nil {
@@ -148,17 +171,16 @@ func syncStatus(name string, isRunning bool, currentStatus string, localPort str
 					t.PID = newPid
 					t.Status = "reconnecting"
 				})
+
 				return "reconnecting"
 			}
+
 			return "disconnected"
 		}
 
-		// If it's "disconnected", it means we just detected the crash.
-		// Move to "disconnected-ready" which will be caught in the NEXT tick (approx 1s later).
 		if currentStatus == "disconnected" {
 			displayStatus = "disconnected-ready"
 		} else {
-			// First step of failure: show it as "disconnected"
 			displayStatus = "disconnected"
 		}
 	} else if !isRunning {
@@ -169,7 +191,6 @@ func syncStatus(name string, isRunning bool, currentStatus string, localPort str
 		}
 	}
 
-	// 2. If the status in config is out of sync with reality, update the config
 	if displayStatus != currentStatus {
 		cfg, err := loadConfig()
 		if err == nil {
@@ -183,7 +204,6 @@ func syncStatus(name string, isRunning bool, currentStatus string, localPort str
 		}
 	}
 
-	// For the UI, "disconnected-ready" still looks like "disconnected"
 	if displayStatus == "disconnected-ready" {
 		return "disconnected"
 	}

@@ -31,11 +31,14 @@ func (i tunnelItem) Title() string {
 		switch status {
 		case "connected":
 			style = runningStyle
+
 		case "disconnected", "disconnected-ready":
 			status = "disconnected"
 			style = errorStyle
+
 		case "reconnecting":
 			style = pendingStyle
+
 		default:
 			style = runningStyle
 		}
@@ -43,6 +46,5 @@ func (i tunnelItem) Title() string {
 
 	namePart := fmt.Sprintf(fmt.Sprintf("%%-%ds", i.maxNameLen), i.config.Name)
 	portPart := fmt.Sprintf(fmt.Sprintf("%%%ds", i.maxPortLen), i.config.LocalPort)
-
 	return fmt.Sprintf("%s     %s   %s", namePart, portPart, style.Render(status))
 }

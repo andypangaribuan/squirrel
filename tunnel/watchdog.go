@@ -11,6 +11,7 @@
 package tunnel
 
 import (
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -23,7 +24,7 @@ import (
 
 func runWorker(name string) {
 	updateStatus := func(status string, sshPid int) {
-		for range 5 {
+		for i := range 5 {
 			cfg, err := loadConfig()
 			if err == nil {
 				_ = cfg.atomicUpdate(name, func(t *stuTunnelConfig) {
@@ -32,12 +33,29 @@ func runWorker(name string) {
 				})
 				return
 			}
+
+			log.Printf("Worker [%s]: Failed to load config for status update (attempt %d): %v", name, i+1, err)
 			time.Sleep(100 * time.Millisecond)
 		}
+		log.Printf("Worker [%s]: Failed to update status after retries.", name)
+	}
+
+	home, _ := os.UserHomeDir()
+	logPath := filepath.Join(home, ".config", "squirrel", "tunnel.log")
+	_ = os.MkdirAll(filepath.Dir(logPath), 0755)
+	f, _ := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if f != nil {
+		defer func() {
+			_ = f.Close()
+		}()
+
+		mw := io.MultiWriter(f, os.Stderr)
+		log.SetOutput(mw)
 	}
 
 	cfg, err := loadConfig()
 	if err != nil {
+		log.Printf("Worker [%s]: Failed to load config: %v", name, err)
 		os.Exit(1)
 	}
 
@@ -47,10 +65,11 @@ func runWorker(name string) {
 	}
 
 	updateStatus("reconnecting", os.Getpid())
-	time.Sleep(1 * time.Second) // Ensure "reconnecting" is visible for 1s
+	time.Sleep(1 * time.Second)
 
 	tunnel, err := startSSHTunnelGo(&t)
 	if err != nil {
+		log.Printf("Worker [%s]: Failed to start tunnel: %v", name, err)
 		updateStatus("disconnected", os.Getpid())
 		os.Exit(1)
 	}
@@ -61,6 +80,7 @@ func runWorker(name string) {
 		updateStatus("reconnecting", os.Getpid())
 		os.Exit(1)
 	}
+
 	os.Exit(0)
 }
 
@@ -82,6 +102,11 @@ func runWatchdog(name string) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
+	cfg, _ := loadConfig()
+	_ = cfg.atomicUpdate(name, func(t *stuTunnelConfig) {
+		t.PID = os.Getpid()
+	})
+
 	var currentWorker *exec.Cmd
 	var mu sync.Mutex
 
@@ -92,15 +117,16 @@ func runWatchdog(name string) {
 		if currentWorker != nil && currentWorker.Process != nil {
 			_ = currentWorker.Process.Signal(syscall.SIGTERM)
 		}
+
 		mu.Unlock()
 
-		// Final status cleanup
 		cfg, _ := loadConfig()
 		_ = cfg.atomicUpdate(name, func(t *stuTunnelConfig) {
 			t.PID = 0
 			t.SshPid = 0
 			t.Status = ""
 		})
+
 		os.Exit(0)
 	}()
 
@@ -117,7 +143,6 @@ func runWatchdog(name string) {
 			return
 		}
 
-		// Ensure the local port is clear before starting the worker
 		if t.LocalPort != "" {
 			portPid := getPidByPort(t.LocalPort)
 			if portPid > 0 && portPid != os.Getpid() {
@@ -139,11 +164,9 @@ func runWatchdog(name string) {
 		currentWorker = worker
 		mu.Unlock()
 
-		// Monitor the worker
 		err = worker.Wait()
 		log.Printf("Watchdog [%s]: Worker process exited: %v", name, err)
 
-		// Explicitly set status to disconnected in config so it's recorded even if UI is closed
 		cfg, _ = loadConfig()
 		_ = cfg.atomicUpdate(name, func(t *stuTunnelConfig) {
 			t.Status = "disconnected"

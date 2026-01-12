@@ -54,8 +54,6 @@ func loadConfig() (*stuConfig, error) {
 		_ = f.Close()
 	}()
 
-	// Advisory lock (shared lock for reading)
-	// We use an exclusive lock for everything just to be safe and simple given the low volume.
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		return nil, err
 	}
@@ -96,6 +94,7 @@ func saveConfig(cfg *stuConfig) error {
 	if err := f.Truncate(0); err != nil {
 		return err
 	}
+
 	if _, err := f.Seek(0, 0); err != nil {
 		return err
 	}
@@ -167,9 +166,11 @@ func (c *stuConfig) deleteTunnel(name string) error {
 			break
 		}
 	}
+
 	if !found {
 		return fmt.Errorf("tunnel with name %s not found", name)
 	}
+
 	return saveConfig(latest)
 }
 
@@ -179,6 +180,7 @@ func (c *stuConfig) getTunnel(name string) (stuTunnelConfig, bool) {
 			return t, true
 		}
 	}
+
 	return stuTunnelConfig{}, false
 }
 
@@ -220,6 +222,7 @@ func (c *stuConfig) atomicUpdate(name string, updater func(*stuTunnelConfig)) er
 	if err := f.Truncate(0); err != nil {
 		return err
 	}
+
 	if _, err := f.Seek(0, 0); err != nil {
 		return err
 	}

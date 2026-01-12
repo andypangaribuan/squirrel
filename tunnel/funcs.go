@@ -24,6 +24,7 @@ func tick() tea.Cmd {
 
 func calculateMaxLengths(tunnels []stuTunnelConfig) (int, int) {
 	maxN, maxP := 0, 0
+
 	for _, t := range tunnels {
 		if len(t.Name) > maxN {
 			maxN = len(t.Name)
@@ -32,8 +33,10 @@ func calculateMaxLengths(tunnels []stuTunnelConfig) (int, int) {
 			maxP = len(t.LocalPort)
 		}
 	}
+
 	if maxP < 4 {
 		maxP = 4
 	}
+
 	return maxN, maxP
 }

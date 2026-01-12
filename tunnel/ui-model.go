@@ -232,16 +232,19 @@ func (m itemModel) handleAction(action string) (tea.Model, tea.Cmd) {
 		startTunnelLogic(name)
 		m.state = stateList
 		return m, nil
+
 	case "Stop":
 		stopTunnelLogic(name)
 		m.state = stateList
 		return m, nil
+
 	case "Delete":
 		m.state = stateForm
 		return m, tea.ExecProcess(exec.Command("clear"), func(err error) tea.Msg {
 			deleteTunnelLogic(name)
 			return formFinishedMsg{}
 		})
+
 	case "Update":
 		m.state = stateForm
 		return m, tea.ExecProcess(exec.Command("clear"), func(err error) tea.Msg {
