@@ -26,11 +26,20 @@ info : execute taskfile cli
 usage: sq taskfile
 
 {options}
-  --file   [+value|csv] path of .taskfile (default current directory)
+  --file      [+value|csv] path of .taskfile (default current directory)
+  --execute   render the .taskfile and execute the commands
 `, map[string]any{})
 
 	isOptHelp, index := arg.Search("--help")
 	arg.Remove(index)
+
+	isOptExecute, index := arg.Search("--execute")
+	arg.Remove(index)
+
+	if isOptExecute {
+		cliTaskfileExecute()
+		return
+	}
 
 	filePaths := arg.GetOptValue(moreInfoMessage, "--file")
 

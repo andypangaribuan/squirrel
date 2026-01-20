@@ -22,7 +22,8 @@
       //   "pods",
       //   "events"
       // ]
-      "args": ["tunnel", "--ssh"]
+      // "args": ["tunnel", "--ssh"]
+      "args": ["taskfile", "--execute"]
     }
   ]
 }

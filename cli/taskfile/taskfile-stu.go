@@ -14,3 +14,15 @@ type stuTaskfile struct {
 	items            [][]any
 	newLineAtIndexes []int
 }
+
+type stuTaskItem struct {
+	name        string
+	description string
+	isSpace     bool
+}
+
+type stuTaskParsed struct {
+	stuTaskItem
+	p1 string
+	p2 string
+}
