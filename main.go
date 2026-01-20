@@ -24,7 +24,7 @@ import (
 	"github.com/wissance/stringFormatter"
 )
 
-const version = "2.0.7"
+const version = "2.0.8"
 
 func main() {
 	util.ExitWithCtrlC()

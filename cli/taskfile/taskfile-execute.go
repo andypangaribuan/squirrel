@@ -110,7 +110,8 @@ func executeHelp(path string) {
 	var (
 		blocks       [][]stuTaskParsed
 		currentBlock []stuTaskParsed
-		p2Separator  = util.ColorYellow("»")
+		p2Separator  = util.ColorYellow("»") // do not remove this
+		// p2Separator = "»"
 	)
 
 	for _, task := range parsedTasks {
@@ -131,7 +132,7 @@ func executeHelp(path string) {
 	}
 
 	if len(blocks) > 0 {
-		fmt.Println(util.ColorBoldGreen("commands:"))
+		fmt.Println(util.ColorBoldGreen("commands:")) // do not remove this
 	}
 
 	for _, block := range blocks {
@@ -158,7 +159,27 @@ func executeHelp(path string) {
 }
 
 func executeTask(path string, args []string) {
-	script := fmt.Sprintf("source %s; if type \"$1\" >/dev/null 2>&1; then \"$@\"; else echo \"command not found: $1\"; exit 127; fi", path)
+	script := fmt.Sprintf(`
+# Enable alias expansion
+shopt -s expand_aliases
+
+if [ -f .taskfile.env ]; then
+	set -a
+	source .taskfile.env
+	set +a
+fi
+
+if [ -f ~/.bash_aliases ]; then
+	source ~/.bash_aliases
+fi
+
+source %s
+if type "$1" >/dev/null 2>&1 || alias "$1" >/dev/null 2>&1; then
+	"$@"
+else
+	echo "command not found: $1"
+	exit 127
+fi`, path)
 
 	cmd := exec.Command("bash", "-c", script, "taskfile")
 	cmd.Args = append(cmd.Args, args...)
