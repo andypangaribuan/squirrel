@@ -16,22 +16,6 @@ sudo chmod +x /usr/local/bin/sq
 sq --help
 ```
 
-## Debian dependencies
-
-```sh
-sudo apt update
-sudo apt install -y \
-  libx11-dev \
-  libxtst-dev \
-  libxinerama-dev \
-  libxrandr-dev \
-  libxcursor-dev \
-  libxdamage-dev \
-  libxcomposite-dev \
-  libxkbcommon-dev \
-  libxkbcommon-x11-dev
-```
-
 ## Third party package
 
 This sq cli using 3rd party package, you can install using brew:
@@ -53,7 +37,7 @@ If you fixed a bug or implemented a feature, please send a [`pull request`](http
 
 ## MIT License
 
-Copyright (c) 2025 Andy Pangaribuan
+Copyright (c) 2026 Andy Pangaribuan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
