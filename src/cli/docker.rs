@@ -9,7 +9,6 @@
 
 use crate::color;
 use crate::util;
-use std::process::Command;
 
 pub struct ImageItem {
     pub image: String,
@@ -43,8 +42,8 @@ info : execute docker cli
 usage: sq docker
 
 {commands}
-  ps       list containers
-  images   list docker image"#
+  ps       list container
+  images   list image"#
     ));
 }
 
@@ -68,21 +67,7 @@ pub fn exec_docker_images(args: &[String]) {
         }
     }
 
-    let output = match Command::new("docker").arg("images").output() {
-        Ok(out) => out,
-        Err(err) => {
-            eprintln!("Error executing docker command: {}", err);
-            std::process::exit(1);
-        }
-    };
-
-    if !output.status.success() {
-        let err_msg = String::from_utf8_lossy(&output.stderr);
-        eprint!("{}", err_msg);
-        std::process::exit(output.status.code().unwrap_or(1));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let (_, stdout) = util::exec("docker images", true, false);
     let lines: Vec<&str> = stdout.lines().collect();
 
     // Find header line
@@ -229,10 +214,5 @@ fn print_images_table(items: &[ImageItem]) {
 }
 
 pub fn exec_docker_ps(args: &[String]) {
-    let status = Command::new("docker").arg("ps").args(args).status();
-
-    if let Err(err) = status {
-        eprintln!("Error executing docker ps: {}", err);
-        std::process::exit(1);
-    }
+    util::exec(format!("docker ps {}", args.join(" ")).trim(), true, true);
 }
