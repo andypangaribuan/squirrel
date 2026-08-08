@@ -23,3 +23,4 @@ res/envs/*.env
 *.lock
 
 .DS_Store
+.releases/*
