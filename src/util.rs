@@ -6,3 +6,7 @@
  * licenses restricting copying, distribution and decompilation.
  * All Rights Reserved.
  */
+
+pub fn print<T: AsRef<str>>(text: T) {
+    println!("{}", text.as_ref().trim());
+}

@@ -8,6 +8,7 @@
  */
 
 use crate::color;
+use crate::util;
 use std::process::Command;
 
 pub struct ImageItem {
@@ -36,19 +37,15 @@ pub fn run(args: &[String]) {
 
 fn print_help() {
     let commands = color::bold_green("commands:");
-    println!(
-        "{}",
-        format!(
-            r#"
+    util::print(format!(
+        r#"
 info : execute docker cli
 usage: sq docker
 
 {commands}
   ps       list containers
   images   list docker image"#
-        )
-        .trim()
-    );
+    ));
 }
 
 pub fn exec_docker_images(args: &[String]) {

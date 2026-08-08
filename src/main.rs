@@ -35,10 +35,8 @@ fn main() {
 
 fn print_help() {
     let commands = color::bold_green("commands:");
-    println!(
-        "{}",
-        format!(
-            r#"
+    util::print(format!(
+        r#"
 usage: sq
 
 {commands}
@@ -48,7 +46,5 @@ usage: sq
   tunnel     manage ssh tunnels
   ext        execute ext cli
   version    print sq-cli version"#
-        )
-        .trim()
-    );
+    ));
 }
