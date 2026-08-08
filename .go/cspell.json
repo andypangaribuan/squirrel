@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "dictionaryDefinitions": [
+    {
+      "name": "project",
+      "path": "./cspell.txt",
+      "addWords": true,
+      "scope": ["workspace"]
+    }
+  ],
+  "dictionaries": ["project"],
+  "words": ["andypangaribuan", "pangaribuan", "decompilation", "taskfile"],
+  "ignorePaths": [
+    "*.mod",
+    "*.sum",
+    "*.md",
+    "*.taskfile",
+    "LICENSE",
+    ".gitignore",
+    "test/**",
+    "res/**",
+    "grc/**",
+    "http-client/**",
+    ".vscode/**"
+  ]
+}

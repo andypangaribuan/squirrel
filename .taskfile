@@ -1,57 +1,68 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright (c) 2025.
+# Copyright (c) 2026.
 # Created by Andy Pangaribuan. All Rights Reserved.
 # This product is protected by copyright and distributed under
 # licenses restricting copying, distribution and decompilation.
 
 
-#: update + check
-function run {
-  go mod tidy
-  go vet
-  gofmt -l .
-  golangci-lint run
-  staticcheck ./...
+
+#: check the code with cargo check, build, clippy and fmt
+function check {
+  cargo check
+  cargo build
+  cargo clippy && cargo fmt --check
+}
+
+
+#: clean the project
+function clean {
+  cargo clean
+}
+
+
+#: do cargo test
+function test {
+  cargo test -q -- --test-threads=1
 }
 
 
 #: run cspell to check the project words
 function spell {
-  img=ghcr.io/streetsidesoftware/cspell:9.0.1
-  docker run --rm \
-    --platform linux/amd64 \
-    -v $PWD:/workdir \
-    $img "**" \
-    --quiet
+  spell-rs
 }
 
 
 #: space
 
 
-#: build the project and move to local machine
-function build {
-  rm -rf squirrel
-  go build
+#: open devbox shell #: opt: --fresh (delete .cargo and .rustup directories first)
+function shell {
+  if [ "$DEVBOX_SHELL_ENABLED" = "1" ]; then
+    echo "ℹ️  You are already in an active Devbox shell."
+    return 0
+  fi
 
-  sudo rm -rf /usr/local/bin/sq &>/dev/null
-  sudo mv squirrel /usr/local/bin/sq
+  if [[ $1 == "--fresh" ]]; then
+    rm -rf .cargo .rustup
+  fi
+
+  DEVBOX_PROJECT_CWD="$PWD" devbox shell --config ~/.devbox/global/rust-1.96/devbox.json
 }
 
 
-#: release the cli app
-function release {
-  file=$(echo "sq-$(uname -s)-$(uname -m)" | tr '[:upper:]' '[:lower:]')
-  mkdir -p .releases
-  rm -rf squirrel
-  rm -rf .releases/$file
-  go build
-  mv squirrel .releases/$file
+#: show unused dependencies
+function udeps {
+  cargo +nightly udeps
+}
+
+
+#: remove unused directories
+function rmd {
+  rm -rf .cargo .devbox .rustup debug target test-debug
 }
 
 
 
 #: space
-
 [ -z "$TASKFILE_EXECUTOR" ] && sq taskfile --execute "$@"

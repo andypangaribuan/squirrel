@@ -3,27 +3,19 @@
   "configurations": [
     {
       "name": "debug",
-      "type": "go",
+      "type": "lldb",
       "request": "launch",
-      "mode": "debug",
-      "program": "main.go",
-      "console": "integratedTerminal",
-      // "args": ["--help"]
-      // "args": ["version"]
-      // "args": ["docker"]
-      // "args": ["docker", "images", "--contains=php", "--order=tag"]
-      // "args": ["kube", "pods", "-n=ns-stg", "asset-service", "bridge-api"]
-      // "args": [
-      //   "kube",
-      //   "action",
-      //   "--namespace=ns-stg",
-      //   "--app=user-kyc-api",
-      //   "--yml=sa,secret,dep,pdb,hpa,svc,ing",
-      //   "pods",
-      //   "events"
-      // ]
-      // "args": ["tunnel", "--ssh"]
-      "args": ["taskfile", "--execute"]
+      "program": "${workspaceFolder}/target/debug/squirrel",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "RUSTUP_HOME": "${workspaceFolder}/.rustup",
+        "LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.96/.devbox/nix/profile/default/lib",
+        "DYLD_LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.96/.devbox/nix/profile/default/lib",
+        "DEVELOPER_DIR": "/Library/Developer/CommandLineTools",
+        "LLDB_DEBUGSERVER_PATH": "/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
+      },
+      "preLaunchTask": "cargo build",
+      "envFile": "${workspaceFolder}/res/envs/id-stg.env"
     }
   ]
 }

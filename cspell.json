@@ -10,18 +10,31 @@
     }
   ],
   "dictionaries": ["project"],
-  "words": ["andypangaribuan", "pangaribuan", "decompilation", "taskfile"],
+  "words": ["andypangaribuan", "pangaribuan", "decompilation"],
   "ignorePaths": [
+    ".devbox/**",
+    ".rustup/**",
+    ".vscode/**",
+    ".devcontainer/**",
+    ".venv/**",
+    "target/**",
+    "test-debug/**",
+    "debug/**",
+
     "*.mod",
     "*.sum",
     "*.md",
     "*.taskfile",
+    "*.sh",
+    "*.toml",
+    "devbox.json",
     "LICENSE",
     ".gitignore",
     "test/**",
     "res/**",
     "grc/**",
     "http-client/**",
-    ".vscode/**"
+
+    "requirements.txt"
   ]
 }

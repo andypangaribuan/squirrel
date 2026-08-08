@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Copyright (c) 2025.
+# Created by Andy Pangaribuan. All Rights Reserved.
+# This product is protected by copyright and distributed under
+# licenses restricting copying, distribution and decompilation.
+
+
+#: update + check
+function run {
+  go mod tidy
+  go vet
+  gofmt -l .
+  golangci-lint run
+  staticcheck ./...
+}
+
+
+#: run cspell to check the project words
+function spell {
+  img=ghcr.io/streetsidesoftware/cspell:9.0.1
+  docker run --rm \
+    --platform linux/amd64 \
+    -v $PWD:/workdir \
+    $img "**" \
+    --quiet
+}
+
+
+#: space
+
+
+#: build the project and move to local machine
+function build {
+  rm -rf squirrel
+  go build
+
+  sudo rm -rf /usr/local/bin/sq &>/dev/null
+  sudo mv squirrel /usr/local/bin/sq
+}
+
+
+#: release the cli app
+function release {
+  file=$(echo "sq-$(uname -s)-$(uname -m)" | tr '[:upper:]' '[:lower:]')
+  mkdir -p .releases
+  rm -rf squirrel
+  rm -rf .releases/$file
+  go build
+  mv squirrel .releases/$file
+}
+
+
+
+#: space
+
+[ -z "$TASKFILE_EXECUTOR" ] && sq taskfile --execute "$@"
