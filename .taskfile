@@ -86,9 +86,11 @@ function move {
 
 #: use old sq
 function old {
-  sudo rm -rf /usr/local/bin/sqo && \
-  sudo curl -L https://github.com/andypangaribuan/squirrel/releases/latest/download/sq-`uname -s`-`uname -m` -o /usr/local/bin/sqo && \
-  sudo chmod +x /usr/local/bin/sqo
+  # sudo rm -rf /usr/local/bin/sqo && \
+  # sudo curl -L https://github.com/andypangaribuan/squirrel/releases/latest/download/sq-`uname -s`-`uname -m` -o /usr/local/bin/sqo && \
+  # sudo chmod +x /usr/local/bin/sqo
+
+  sudo cp /usr/local/bin/sqo /usr/local/bin/sq
 }
 
 

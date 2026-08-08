@@ -44,7 +44,6 @@ usage: sq
   kube       execute kubectl cli
   taskfile   execute taskfile cli
   tunnel     manage ssh tunnels
-  ext        execute ext cli
-  version    print sq version"#
+  ext        execute ext cli"#
     ));
 }

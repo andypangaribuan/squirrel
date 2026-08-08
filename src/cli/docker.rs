@@ -36,7 +36,7 @@ info : execute docker cli
 usage: sq docker
 
 {commands}
-  ps       list container
+  ps       list container, opt: -c/--compact
   images   list image"#
     ));
 }
@@ -99,11 +99,26 @@ pub fn exec_docker_images(args: &[String]) {
 }
 
 pub fn exec_docker_ps(args: &[String]) {
-    let cmd = format!("docker ps {}", args.join(" ")).trim().to_string();
+    let mut is_compact = false;
+    let mut filtered_args = Vec::new();
+
+    for arg in args {
+        if arg == "--compact" || arg == "-c" {
+            is_compact = true;
+        } else {
+            filtered_args.push(arg.clone());
+        }
+    }
+
+    let cmd = format!("docker ps {}", filtered_args.join(" ")).trim().to_string();
     let (is_error, output) = util::exec(&cmd, true, false);
 
     if !is_error {
-        let headers = vec!["CREATED", "IMAGE", "STATUS", "PORTS"];
+        let headers = if is_compact {
+            vec!["NAMES", "STATUS", "PORTS"]
+        } else {
+            vec!["CREATED", "IMAGE", "NAMES", "STATUS", "PORTS"]
+        };
         let mut loaded = util::table_loader(&output, &headers);
 
         for row in &mut loaded {
