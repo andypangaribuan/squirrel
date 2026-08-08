@@ -5,7 +5,7 @@
       "name": "debug",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/target/debug/squirrel",
+      "program": "${workspaceFolder}/target/debug/sq",
       "cwd": "${workspaceFolder}",
       "env": {
         "RUSTUP_HOME": "${workspaceFolder}/.rustup",
@@ -15,7 +15,7 @@
         "LLDB_DEBUGSERVER_PATH": "/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
       },
       "preLaunchTask": "cargo build",
-      "envFile": "${workspaceFolder}/res/envs/id-stg.env"
+      "args": ["docker"]
     }
   ]
 }

@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 description = "Squirrel CLI"
 
+[[bin]]
+name = "sq"
+path = "src/main.rs"
+
+
 
 [profile.release]
 # debug = 0 (default): No information. You only get function names (which are sometimes mangled).

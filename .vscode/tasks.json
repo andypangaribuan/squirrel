@@ -4,7 +4,7 @@
     {
       "label": "cargo build",
       "type": "shell",
-      "command": "cargo build --bin squirrel && codesign -s - -f --entitlements entitlements.plist target/debug/squirrel",
+      "command": "cargo build --bin sq && codesign -s - -f --entitlements entitlements.plist target/debug/sq",
       "args": [],
       "group": "build",
       "problemMatcher": ["$rustc"]
