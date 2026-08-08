@@ -59,9 +59,37 @@ function udeps {
 
 #: remove unused directories
 function rmd {
-  rm -rf .cargo .devbox .rustup debug target test-debug
+  # rm -rf .cargo .devbox .rustup debug target test-debug
+  echo "hey"
 }
 
+
+#: space
+
+
+#: build the cli app
+function build {
+  mkdir -p .releases
+  rm -rf .releases/sq
+  cargo build --release
+  mv target/release/sq .releases/
+  chmod +x .releases/sq
+  rm -rf target
+}
+
+
+#: move sq into /usr/local/bin/sq
+function move {
+  sudo mv .releases/sq /usr/local/bin/sq
+}
+
+
+#: use old sq
+function old {
+  sudo rm -rf /usr/local/bin/sqo && \
+  sudo curl -L https://github.com/andypangaribuan/squirrel/releases/latest/download/sq-`uname -s`-`uname -m` -o /usr/local/bin/sqo && \
+  sudo chmod +x /usr/local/bin/sqo
+}
 
 
 #: space

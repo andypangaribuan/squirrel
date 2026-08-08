@@ -10,3 +10,7 @@
 pub fn bold_green(text: &str) -> String {
     format!("\x1b[1;32m{}\x1b[0m", text)
 }
+
+pub fn yellow(text: &str) -> String {
+    format!("\x1b[33m{}\x1b[0m", text)
+}

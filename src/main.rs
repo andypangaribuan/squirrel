@@ -11,7 +11,7 @@ mod cli;
 mod color;
 mod util;
 
-const VERSION: &str = "2.0.8";
+const VERSION: &str = "2.0.9";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -45,6 +45,6 @@ usage: sq
   taskfile   execute taskfile cli
   tunnel     manage ssh tunnels
   ext        execute ext cli
-  version    print sq-cli version"#
+  version    print sq version"#
     ));
 }

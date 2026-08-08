@@ -10,12 +10,6 @@
 use crate::color;
 use crate::util;
 
-pub struct ImageItem {
-    pub image: String,
-    pub disk_usage: String,
-    pub extra: String,
-}
-
 pub fn run(args: &[String]) {
     if args.is_empty() {
         print_help();
@@ -67,152 +61,139 @@ pub fn exec_docker_images(args: &[String]) {
         }
     }
 
-    let (_, stdout) = util::exec("docker images", true, false);
-    let lines: Vec<&str> = stdout.lines().collect();
+    let (_, output) = util::exec("docker images", true, false);
 
-    // Find header line
-    let mut header_idx = None;
-    for (idx, line) in lines.iter().enumerate() {
-        let upper = line.to_uppercase();
-        if upper.contains("IMAGE") || upper.contains("REPOSITORY") {
-            header_idx = Some(idx);
-            break;
-        }
-    }
-
-    let header_idx = match header_idx {
-        Some(idx) => idx,
-        None => {
-            print!("{}", stdout);
-            return;
-        }
+    let (headers, mut loaded) = if output.to_uppercase().contains("DISK USAGE") {
+        let hdrs = vec!["IMAGE", "DISK USAGE", "EXTRA"];
+        let data = util::table_loader(&output, &hdrs);
+        (hdrs, data)
+    } else {
+        let hdrs = vec!["REPOSITORY", "TAG", "SIZE", "EXTRA"];
+        let data = util::table_loader(&output, &hdrs);
+        let hdrs = vec!["IMAGE", "DISK USAGE", "EXTRA"];
+        let data = data
+            .into_iter()
+            .map(|row| {
+                let repo = row.get("REPOSITORY").cloned().unwrap_or_default();
+                let tag = row.get("TAG").cloned().unwrap_or_default();
+                let img = if tag.is_empty() || tag == "<none>" { repo } else { format!("{}:{}", repo, tag) };
+                let disk = row.get("SIZE").cloned().unwrap_or_default();
+                let extra = row.get("EXTRA").cloned().unwrap_or_default();
+                let mut map = std::collections::HashMap::new();
+                map.insert("IMAGE".to_string(), img);
+                map.insert("DISK USAGE".to_string(), disk);
+                map.insert("EXTRA".to_string(), extra);
+                map
+            })
+            .collect();
+        (hdrs, data)
     };
-
-    let mut items = parse_docker_images_lines(lines[header_idx], &lines[header_idx + 1..]);
 
     if let Some(ref filter) = contains_filter {
         let filter_lower = filter.to_lowercase();
-        items.retain(|item| item.image.to_lowercase().contains(&filter_lower));
+        loaded.retain(|row| row.get("IMAGE").map(|img| img.to_lowercase().contains(&filter_lower)).unwrap_or(false));
     }
 
-    print_images_table(&items);
-}
-
-fn parse_docker_images_lines(header: &str, rows: &[&str]) -> Vec<ImageItem> {
-    let header_upper = header.to_uppercase();
-    let mut items = Vec::new();
-
-    if header_upper.contains("IMAGE") && (header_upper.contains("DISK USAGE") || header_upper.contains("SIZE")) {
-        // Modern Containerd Docker format
-        let idx_image = header_upper.find("IMAGE").unwrap_or(0);
-        let idx_id = header_upper.find("ID").unwrap_or(header.len());
-
-        let idx_disk_usage = header_upper.find("DISK USAGE").or_else(|| header_upper.find("SIZE")).unwrap_or(header.len());
-
-        let idx_content_size = header_upper.find("CONTENT SIZE").unwrap_or(header.len());
-        let idx_extra = header_upper.find("EXTRA");
-
-        for line in rows {
-            if line.trim().is_empty() || line.starts_with("WARNING:") || line.starts_with("i Info") {
-                continue;
-            }
-
-            let get_substr = |start: usize, end: usize| -> String {
-                if start >= line.len() {
-                    return String::new();
-                }
-                let actual_end = std::cmp::min(end, line.len());
-                line[start..actual_end].trim().to_string()
-            };
-
-            let image = get_substr(idx_image, idx_id);
-            let disk_usage = if idx_content_size < line.len() && idx_content_size > idx_disk_usage {
-                get_substr(idx_disk_usage, idx_content_size)
-            } else if let Some(e_idx) = idx_extra {
-                get_substr(idx_disk_usage, e_idx)
-            } else {
-                get_substr(idx_disk_usage, line.len())
-            };
-
-            let extra = match idx_extra {
-                Some(e_idx) => get_substr(e_idx, line.len()),
-                None => String::new(),
-            };
-
-            if !image.is_empty() {
-                items.push(ImageItem { image, disk_usage, extra });
-            }
-        }
-    } else if header_upper.contains("REPOSITORY") && header_upper.contains("TAG") {
-        // Traditional Docker format
-        let idx_repo = header_upper.find("REPOSITORY").unwrap_or(0);
-        let idx_tag = header_upper.find("TAG").unwrap_or(header.len());
-        let idx_id = header_upper.find("IMAGE ID").unwrap_or(header.len());
-        let idx_size = header_upper.find("SIZE").unwrap_or(header.len());
-        let idx_extra = header_upper.find("EXTRA");
-
-        for line in rows {
-            if line.trim().is_empty() || line.starts_with("WARNING:") {
-                continue;
-            }
-
-            let get_substr = |start: usize, end: usize| -> String {
-                if start >= line.len() {
-                    return String::new();
-                }
-                let actual_end = std::cmp::min(end, line.len());
-                line[start..actual_end].trim().to_string()
-            };
-
-            let repo = get_substr(idx_repo, idx_tag);
-            let tag = get_substr(idx_tag, idx_id);
-            let image = if tag.is_empty() || tag == "<none>" { repo } else { format!("{}:{}", repo, tag) };
-
-            let disk_usage = match idx_extra {
-                Some(e_idx) => get_substr(idx_size, e_idx),
-                None => get_substr(idx_size, line.len()),
-            };
-
-            let extra = match idx_extra {
-                Some(e_idx) => get_substr(e_idx, line.len()),
-                None => String::new(),
-            };
-
-            if !image.is_empty() {
-                items.push(ImageItem { image, disk_usage, extra });
-            }
-        }
-    }
-
-    items
-}
-
-fn print_images_table(items: &[ImageItem]) {
-    let mut max_img_len = "IMAGE".len();
-    let mut max_disk_len = "DISK USAGE".len();
-
-    for item in items {
-        if item.image.len() > max_img_len {
-            max_img_len = item.image.len();
-        }
-        if item.disk_usage.len() > max_disk_len {
-            max_disk_len = item.disk_usage.len();
-        }
-    }
-
-    // Print Header
-    println!("{:<max_img_len$}   {:<max_disk_len$}   EXTRA", "IMAGE", "DISK USAGE");
-
-    // Print Rows
-    for item in items {
-        if item.extra.is_empty() {
-            println!("{:<max_img_len$}   {}", item.image, item.disk_usage);
-        } else {
-            println!("{:<max_img_len$}   {:<max_disk_len$}   {}", item.image, item.disk_usage, item.extra);
-        }
-    }
+    let items = util::table_to_items(&loaded, &headers);
+    util::print(util::table_print(&headers, &items));
 }
 
 pub fn exec_docker_ps(args: &[String]) {
-    util::exec(format!("docker ps {}", args.join(" ")).trim(), true, true);
+    let cmd = format!("docker ps {}", args.join(" ")).trim().to_string();
+    let (is_error, output) = util::exec(&cmd, true, false);
+
+    if !is_error {
+        let headers = vec!["CREATED", "IMAGE", "STATUS", "PORTS"];
+        let mut loaded = util::table_loader(&output, &headers);
+
+        for row in &mut loaded {
+            if let Some(ports) = row.get_mut("PORTS") {
+                *ports = format_ports(ports);
+            }
+        }
+
+        let items = util::table_to_items(&loaded, &headers);
+        util::print(util::table_print(&headers, &items));
+    }
+}
+
+fn format_ports(raw_ports: &str) -> String {
+    if raw_ports.trim().is_empty() {
+        return String::new();
+    }
+
+    let mut formatted: Vec<String> = Vec::new();
+    for item in raw_ports.split(',') {
+        let item = item.trim();
+        if item.contains("0.0.0.0:") {
+            if let Some(idx) = item.find("0.0.0.0:") {
+                let after_ip = &item[idx + "0.0.0.0:".len()..];
+                let port_mapping = match after_ip.find('/') {
+                    Some(slash_idx) => &after_ip[..slash_idx],
+                    None => after_ip,
+                }
+                .trim();
+
+                let port_mapping = if port_mapping.contains("->") {
+                    let parts: Vec<&str> = port_mapping.split("->").collect();
+                    if parts.len() == 2 && parts[0] == parts[1] { parts[0] } else { port_mapping }
+                } else {
+                    port_mapping
+                };
+
+                if !port_mapping.is_empty() {
+                    add_port_mapping(&mut formatted, port_mapping);
+                }
+            }
+        }
+    }
+
+    if formatted.is_empty() { raw_ports.to_string() } else { formatted.join(", ") }
+}
+
+fn add_port_mapping(formatted: &mut Vec<String>, mapping: &str) {
+    if formatted.contains(&mapping.to_string()) {
+        return;
+    }
+
+    if let Some((p_start, p_end)) = parse_port_range(mapping) {
+        for existing in formatted.iter() {
+            if let Some((e_start, e_end)) = parse_port_range(existing) {
+                if e_start <= p_start && e_end >= p_end {
+                    return;
+                }
+            }
+        }
+
+        let mut idx_to_replace = None;
+        for (i, existing) in formatted.iter().enumerate() {
+            if let Some((e_start, e_end)) = parse_port_range(existing) {
+                if p_start <= e_start && p_end >= e_end {
+                    idx_to_replace = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if let Some(i) = idx_to_replace {
+            formatted[i] = mapping.to_string();
+            return;
+        }
+    }
+
+    formatted.push(mapping.to_string());
+}
+
+fn parse_port_range(s: &str) -> Option<(u32, u32)> {
+    if s.contains('-') {
+        let parts: Vec<&str> = s.split('-').collect();
+        if parts.len() == 2 {
+            let start = parts[0].trim().parse::<u32>().ok()?;
+            let end = parts[1].trim().parse::<u32>().ok()?;
+            return Some((start, end));
+        }
+    } else if let Ok(port) = s.trim().parse::<u32>() {
+        return Some((port, port));
+    }
+    None
 }
