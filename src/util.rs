@@ -118,10 +118,8 @@ pub fn table_loader<S: AsRef<str>>(value: &str, headers: &[S]) -> Vec<HashMap<St
         if !is_space && in_spaces {
             all_starts.push(i);
             in_spaces = false;
-        } else if is_space {
-            if i + 1 < raw_header.len() && bytes[i + 1] == b' ' {
-                in_spaces = true;
-            }
+        } else if is_space && i + 1 < raw_header.len() && bytes[i + 1] == b' ' {
+            in_spaces = true;
         }
     }
 

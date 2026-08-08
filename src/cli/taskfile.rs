@@ -50,8 +50,8 @@ pub fn run(args: &[String]) {
                 eprintln!("run 'sq taskfile --help' for more information");
                 std::process::exit(1);
             }
-        } else if arg.starts_with("--file=") {
-            file_paths_opt = arg["--file=".len()..].split(',').map(|s| s.trim().to_string()).collect();
+        } else if let Some(val) = arg.strip_prefix("--file=") {
+            file_paths_opt = val.split(',').map(|s| s.trim().to_string()).collect();
             i += 1;
         } else {
             remains.push(arg.clone());
@@ -213,13 +213,11 @@ fn read_tasks_from_file(path: &str) -> Vec<TaskItem> {
             continue;
         }
 
-        if let Some(ref comment) = last_comment {
-            if let Some(name) = parse_function_name(line) {
-                if name != "help" {
-                    tasks.push(TaskItem { name, description: comment.clone(), is_space: false });
-                }
-                last_comment = None;
+        if let (Some(comment), Some(name)) = (&last_comment, parse_function_name(line)) {
+            if name != "help" {
+                tasks.push(TaskItem { name, description: comment.clone(), is_space: false });
             }
+            last_comment = None;
         }
     }
 
@@ -233,9 +231,8 @@ fn parse_function_name(line: &str) -> Option<String> {
     }
     let line = line[..line.len() - 1].trim();
 
-    let line = if line.starts_with("function") { line["function".len()..].trim() } else { line };
-
-    let line = if line.ends_with("()") { line[..line.len() - 2].trim() } else { line };
+    let line = line.strip_prefix("function").map_or(line, |s| s.trim());
+    let line = line.strip_suffix("()").map_or(line, |s| s.trim());
 
     if !line.is_empty() && line.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') { Some(line.to_string()) } else { None }
 }
@@ -254,15 +251,12 @@ fn print_tasks(tasks: &[TaskItem]) {
 
     let mut parsed_tasks = Vec::new();
     for task in tasks {
-        let mut p1 = task.description.clone();
-        let mut p2 = String::new();
-
-        if !task.is_space {
-            if let Some((before, after)) = task.description.split_once("#:") {
-                p1 = before.trim().to_string();
-                p2 = after.trim().to_string();
-            }
-        }
+        let (p1, p2) = if !task.is_space && task.description.contains("#:") {
+            let (before, after) = task.description.split_once("#:").unwrap();
+            (before.trim().to_string(), after.trim().to_string())
+        } else {
+            (task.description.clone(), String::new())
+        };
 
         parsed_tasks.push(TaskParsed { item: task.clone(), p1, p2 });
     }

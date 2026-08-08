@@ -114,11 +114,7 @@ pub fn exec_docker_ps(args: &[String]) {
     let (is_error, output) = util::exec(&cmd, true, false);
 
     if !is_error {
-        let headers = if is_compact {
-            vec!["NAMES", "STATUS", "PORTS"]
-        } else {
-            vec!["CREATED", "IMAGE", "NAMES", "STATUS", "PORTS"]
-        };
+        let headers = if is_compact { vec!["NAMES", "STATUS", "PORTS"] } else { vec!["CREATED", "IMAGE", "NAMES", "STATUS", "PORTS"] };
         let mut loaded = util::table_loader(&output, &headers);
 
         for row in &mut loaded {
@@ -140,25 +136,23 @@ fn format_ports(raw_ports: &str) -> String {
     let mut formatted: Vec<String> = Vec::new();
     for item in raw_ports.split(',') {
         let item = item.trim();
-        if item.contains("0.0.0.0:") {
-            if let Some(idx) = item.find("0.0.0.0:") {
-                let after_ip = &item[idx + "0.0.0.0:".len()..];
-                let port_mapping = match after_ip.find('/') {
-                    Some(slash_idx) => &after_ip[..slash_idx],
-                    None => after_ip,
-                }
-                .trim();
+        if let Some(idx) = item.find("0.0.0.0:") {
+            let after_ip = &item[idx + "0.0.0.0:".len()..];
+            let port_mapping = match after_ip.find('/') {
+                Some(slash_idx) => &after_ip[..slash_idx],
+                None => after_ip,
+            }
+            .trim();
 
-                let port_mapping = if port_mapping.contains("->") {
-                    let parts: Vec<&str> = port_mapping.split("->").collect();
-                    if parts.len() == 2 && parts[0] == parts[1] { parts[0] } else { port_mapping }
-                } else {
-                    port_mapping
-                };
+            let port_mapping = if port_mapping.contains("->") {
+                let parts: Vec<&str> = port_mapping.split("->").collect();
+                if parts.len() == 2 && parts[0] == parts[1] { parts[0] } else { port_mapping }
+            } else {
+                port_mapping
+            };
 
-                if !port_mapping.is_empty() {
-                    add_port_mapping(&mut formatted, port_mapping);
-                }
+            if !port_mapping.is_empty() {
+                add_port_mapping(&mut formatted, port_mapping);
             }
         }
     }
@@ -173,20 +167,16 @@ fn add_port_mapping(formatted: &mut Vec<String>, mapping: &str) {
 
     if let Some((p_start, p_end)) = parse_port_range(mapping) {
         for existing in formatted.iter() {
-            if let Some((e_start, e_end)) = parse_port_range(existing) {
-                if e_start <= p_start && e_end >= p_end {
-                    return;
-                }
+            if parse_port_range(existing).is_some_and(|(e_start, e_end)| e_start <= p_start && e_end >= p_end) {
+                return;
             }
         }
 
         let mut idx_to_replace = None;
         for (i, existing) in formatted.iter().enumerate() {
-            if let Some((e_start, e_end)) = parse_port_range(existing) {
-                if p_start <= e_start && p_end >= e_end {
-                    idx_to_replace = Some(i);
-                    break;
-                }
+            if parse_port_range(existing).is_some_and(|(e_start, e_end)| p_start <= e_start && p_end >= e_end) {
+                idx_to_replace = Some(i);
+                break;
             }
         }
 

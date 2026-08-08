@@ -1,3 +1,7 @@
 rmod
 taskfile
 shopt
+kyml
+hdrs
+ymls
+statefulset
