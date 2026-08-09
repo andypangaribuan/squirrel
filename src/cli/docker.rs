@@ -36,8 +36,8 @@ info : execute docker cli
 usage: sq docker
 
 {commands}
-  ps       list container, opt: -c/--compact
-  images   list image"#
+  ps       list container   opt: -c/--compact
+  images   list image       opt: -c/--contains"#
     ));
 }
 
@@ -45,16 +45,19 @@ pub fn exec_docker_images(args: &[String]) {
     let mut contains_filter: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
-        if args[i] == "--contains" && i + 1 < args.len() {
+        if (args[i] == "--contains" || args[i] == "-c") && i + 1 < args.len() {
             contains_filter = Some(args[i + 1].clone());
             i += 2;
-        } else if args[i].starts_with("--contains=") {
-            contains_filter = Some(args[i]["--contains=".len()..].to_string());
+        } else if let Some(val) = args[i].strip_prefix("--contains=") {
+            contains_filter = Some(val.to_string());
+            i += 1;
+        } else if let Some(val) = args[i].strip_prefix("-c=") {
+            contains_filter = Some(val.to_string());
             i += 1;
         } else if args[i] == "--help" || args[i] == "-h" {
             println!("info : list docker image");
             println!("usage: sq docker images\n");
-            println!("{}\n  --contains   [+value] filter by image name", color::bold_green("options:"));
+            println!("{}\n  -c, --contains   [+value] filter by image name", color::bold_green("options:"));
             return;
         } else {
             i += 1;
