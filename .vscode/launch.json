@@ -9,8 +9,8 @@
       "cwd": "${workspaceFolder}",
       "env": {
         "RUSTUP_HOME": "${workspaceFolder}/.rustup",
-        "LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.96/.devbox/nix/profile/default/lib",
-        "DYLD_LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.96/.devbox/nix/profile/default/lib",
+        "LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.98/.devbox/nix/profile/default/lib",
+        "DYLD_LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.98/.devbox/nix/profile/default/lib",
         "DEVELOPER_DIR": "/Library/Developer/CommandLineTools",
         "LLDB_DEBUGSERVER_PATH": "/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver"
       },

@@ -27,7 +27,7 @@ fn main() {
         "taskfile" => cli::taskfile::run(&args[1..]),
         "tunnel" => cli::tunnel::run(&args[1..]),
         "ext" => cli::ext::run(&args[1..]),
-        "version" | "--version" | "-v" => println!("version {}", VERSION),
+        "version" | "--version" | "-v" => println!("{}", VERSION),
         "--help" | "-h" | "help" => print_help(),
         _ => print_help(),
     }
