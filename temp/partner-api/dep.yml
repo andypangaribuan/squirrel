@@ -18,27 +18,27 @@ spec:
     metadata:
       labels:
         app: $KYML_APP_NAME
-      annotations:
-        cluster-autoscaler.kubernetes.io/safe-to-evict: "$KYML_POD_SAFE_TO_EVICT"
-        linkerd.io/inject: enabled
-        config.linkerd.io/proxy-cpu-request: $KYML_LINKERD_CPU_REQUEST
-        config.linkerd.io/proxy-cpu-limit: $KYML_LINKERD_CPU_LIMIT
-        config.linkerd.io/proxy-memory-request: $KYML_LINKERD_MEMORY_REQUEST
-        config.linkerd.io/proxy-memory-limit: $KYML_LINKERD_MEMORY_LIMIT
-        config.linkerd.io/skip-outbound-ports: "5432"
+      annotations: #{$KYML_INCLUDE_BLOCK_ANNOTATIONS,DEFAULT:true,DELETE_BLOCK}
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "{$KYML_POD_SAFE_TO_EVICT,DELETE_LINE}"
+        linkerd.io/inject: {$KYML_LINKERD_INJECT,DEFAULT:enabled}
+        config.linkerd.io/proxy-cpu-request: {$KYML_LINKERD_CPU_REQUEST,DEFAULT:100m}
+        config.linkerd.io/proxy-cpu-limit: {$KYML_LINKERD_CPU_LIMIT,DEFAULT:1000m}
+        config.linkerd.io/proxy-memory-request: {$KYML_LINKERD_MEMORY_REQUEST,DEFAULT:128Mi}
+        config.linkerd.io/proxy-memory-limit: {$KYML_LINKERD_MEMORY_LIMIT,DEFAULT:512Mi}
+        config.linkerd.io/skip-outbound-ports: "{$KYML_SKIP_OUTBOUND_PORTS,DELETE_LINE}"
     spec:
-      priorityClassName: $KYML_PRIORITY_CLASS
+      priorityClassName: "{$KYML_PRIORITY_CLASS,DELETE_LINE}"
       terminationGracePeriodSeconds: 90
       serviceAccountName: $KYML_APP_NAME
-      topologySpreadConstraints:
-        - maxSkew: 1
+      topologySpreadConstraints: #{$KYML_INCLUDE_BLOCK_TOPOLOGY_SPREAD,DEFAULT:true,DELETE_BLOCK}
+        - maxSkew: {$KYML_TOPOLOGY_MAX_SKEW_ZONE,DEFAULT:1}
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
           nodeTaintsPolicy: Honor
           labelSelector:
             matchLabels:
               app: $KYML_APP_NAME
-        - maxSkew: 1
+        - maxSkew: {$KYML_TOPOLOGY_MAX_SKEW_HOSTNAME,DEFAULT:1}
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: DoNotSchedule
           nodeTaintsPolicy: Honor
@@ -46,7 +46,7 @@ spec:
             matchLabels:
               app: $KYML_APP_NAME
       containers:
-        - name: cloud-sql-proxy
+        - name: cloud-sql-proxy #{$KYML_INCLUDE_BLOCK_CLOUD_SQL_PROXY,DEFAULT:true,DELETE_BLOCK}
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.25.2
           args:
             - "--structured-logs"
@@ -123,11 +123,11 @@ spec:
             successThreshold: 1
             failureThreshold: 3
             timeoutSeconds: 3
-          lifecycle:
+          lifecycle: #{$KYML_INCLUDE_BLOCK_LIFE_CYCLE,DEFAULT:true,DELETE_BLOCK}
             preStop:
               exec:
                 command: ["/app/x", "--sleep", "30s"]
-          securityContext:
+          securityContext: #{$KYML_INCLUDE_BLOCK_SECURITY_CONTEXT,DEFAULT:true,DELETE_BLOCK}
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true

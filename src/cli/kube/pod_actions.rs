@@ -13,7 +13,13 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-pub(super) fn cli_kube_action_pods(namespace: &str, app_name: &str, args: &[String]) {
+pub(super) fn cli_kube_action_pods(
+    namespace: &str,
+    app_name: &str,
+    args: &[String],
+    log_excludes: &[String],
+    hide_app_datetime: bool,
+) {
     let more_info = "run 'sq kube action pods --help' for more information";
 
     if args.is_empty() {
@@ -36,7 +42,7 @@ pub(super) fn cli_kube_action_pods(namespace: &str, app_name: &str, args: &[Stri
         "watch" => {
             let mut cmd = format!("watch -t -n 1 \"sq kube pods {}\"", app_name);
             if !namespace.is_empty() {
-                cmd.push_str(&format!(" --namespace={}", namespace));
+                cmd = format!("watch -t -n 1 \"sq kube pods -n {} {}\"", namespace, app_name);
             }
             util::exec(&cmd, false, true);
         }
@@ -96,9 +102,52 @@ pub(super) fn cli_kube_action_pods(namespace: &str, app_name: &str, args: &[Stri
         }
 
         "logs" => {
-            let since = args.get(1).map(|s| s.as_str()).unwrap_or("60m");
+            let mut all_excludes: Vec<String> = log_excludes.to_vec();
+            let mut since = "60m".to_string();
+            let mut hide_app_dt = hide_app_datetime;
+
+            let mut idx = 1;
+            while idx < args.len() {
+                let a = &args[idx];
+                if a == "--hide-app-datetime" {
+                    hide_app_dt = true;
+                    idx += 1;
+                } else if a == "--log-exclude" {
+                    if idx + 1 < args.len() {
+                        all_excludes.push(args[idx + 1].clone());
+                        idx += 2;
+                    } else {
+                        idx += 1;
+                    }
+                } else if let Some(val) = a.strip_prefix("--log-exclude=") {
+                    all_excludes.push(val.to_string());
+                    idx += 1;
+                } else if !a.starts_with('-') {
+                    since = a.clone();
+                    idx += 1;
+                } else {
+                    idx += 1;
+                }
+            }
+
+            let mut exclude_flags = String::new();
+            for exc in &all_excludes {
+                let converted = convert_like_to_regex(exc);
+                exclude_flags.push_str(&format!(" -e \"{}\"", converted));
+            }
+
+            let hide_app_dt_sed = if hide_app_dt {
+                " s/ [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]+ ([+-][0-9]{2}:[0-9]{2}|Z) / /g;"
+            } else {
+                ""
+            };
+
             let ns_flag = if namespace.is_empty() { String::new() } else { format!("-n {} ", namespace) };
-            let stern_cmd = format!("stern {}{} -c {} -l app={} -t --since {}", ns_flag, app_name, app_name, app_name, since);
+            let esc = "\x1b";
+            let stern_cmd = format!(
+                "stern --color always {}{} -c {} -l app={} -t --since {}{} 2>&1 | sed -E -u \"s/{}-([a-zA-Z0-9-]+)/\\1/g; s/ ({}\\[[0-9;]*m)*{}({}\\[[0-9;]*m)*//g; s/ ›.*$//g;{} s/([0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}})T([0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}})\\.[0-9]+([+-][0-9]{{2}}:[0-9]{{2}}|Z)/{}\\[34m\\1 \\2 \\3{}\\[0m/g\"",
+                ns_flag, app_name, app_name, app_name, since, exclude_flags, app_name, esc, app_name, esc, hide_app_dt_sed, esc, esc
+            );
             util::exec(&stern_cmd, false, true);
         }
 
@@ -428,12 +477,15 @@ fn get_info_pods(namespace: &str, app_name: &str) -> String {
     let mut output = util::table_print(&headers, &final_items);
 
     if !hpa_headers.is_empty() && !hpa_rows.is_empty() {
-        let mut full_hpa_headers = vec!["".to_string()];
+        let idx_width = final_items.len().to_string().len().max(1);
+        let pad_col = " ".repeat(idx_width);
+
+        let mut full_hpa_headers = vec![pad_col.clone()];
         full_hpa_headers.extend(hpa_headers);
 
         let mut full_hpa_rows = Vec::new();
         for r in hpa_rows {
-            let mut row = vec![String::new()];
+            let mut row = vec![pad_col.clone()];
             row.extend(r);
             full_hpa_rows.push(row);
         }
@@ -443,4 +495,43 @@ fn get_info_pods(namespace: &str, app_name: &str) -> String {
     }
 
     output
+}
+
+fn convert_like_to_regex(pattern: &str) -> String {
+    if !pattern.contains('%') {
+        return pattern.to_string();
+    }
+
+    let starts_with_pct = pattern.starts_with('%');
+    let ends_with_pct = pattern.ends_with('%');
+
+    let mut core = pattern;
+    if starts_with_pct {
+        core = &core[1..];
+    }
+    if ends_with_pct && !core.is_empty() {
+        core = &core[..core.len() - 1];
+    }
+
+    let mut regex = String::new();
+    if !starts_with_pct {
+        regex.push('^');
+    }
+
+    for c in core.chars() {
+        match c {
+            '%' => regex.push_str(".*"),
+            '.' | '[' | ']' | '(' | ')' | '?' | '+' | '*' | '^' | '$' | '\\' | '|' => {
+                regex.push('\\');
+                regex.push(c);
+            }
+            _ => regex.push(c),
+        }
+    }
+
+    if !ends_with_pct {
+        regex.push('$');
+    }
+
+    regex
 }

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::process::{Command, Stdio};
 
 pub fn print<T: AsRef<str>>(text: T) {
-    println!("{}", text.as_ref().trim());
+    println!("{}", text.as_ref().trim_matches('\n'));
 }
 
 pub fn exec(cmd: &str, check: bool, show_output: bool) -> (bool, String) {

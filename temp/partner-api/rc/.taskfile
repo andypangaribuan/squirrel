@@ -8,7 +8,11 @@
 sq kube action \
   --namespace KYML_NAMESPACE \
   --app KYML_APP_NAME \
-  --yml sa,secret,dep,pdb,hpa,svc,ing \
-  --yml-template sa,secret,pdb,hpa,svc-http \
+  --yml sa,secret,dep,pdb,hpa,svc,net,gate \
+  --yml-template sa,secret,pdb,hpa,svc-http,net,gate \
   --yml-version v2a \
+  --log-exclude "defer: 200 OK GET /healthz handler" \
+  --log-exclude "%cron refresh_db: processed, duration%" \
+  --log-exclude "%cron refresh_config_appdata: processed, duration%" \
+  --hide-app-datetime \
   "$@"

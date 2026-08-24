@@ -26,6 +26,8 @@ pub(super) fn cli_kube_action(args: &[String]) {
     let mut namespace = String::new();
     let mut yml_version = String::new();
     let mut yml_templates: Vec<String> = Vec::new();
+    let mut log_excludes: Vec<String> = Vec::new();
+    let mut hide_app_datetime = false;
     let mut remains = Vec::new();
 
     let mut i = 0;
@@ -36,6 +38,9 @@ pub(super) fn cli_kube_action(args: &[String]) {
             i += 1;
         } else if arg == "--verbose" {
             is_verbose = true;
+            i += 1;
+        } else if arg == "--hide-app-datetime" {
+            hide_app_datetime = true;
             i += 1;
         } else if arg == "--app" {
             if i + 1 < args.len() {
@@ -92,6 +97,17 @@ pub(super) fn cli_kube_action(args: &[String]) {
         } else if let Some(val) = arg.strip_prefix("--yml-template=") {
             yml_templates = val.split(',').map(|s| s.trim().to_string()).collect();
             i += 1;
+        } else if arg == "--log-exclude" {
+            if i + 1 < args.len() {
+                log_excludes.push(args[i + 1].clone());
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--log-exclude=") {
+            log_excludes.push(val.to_string());
+            i += 1;
         } else {
             remains.push(arg.clone());
             i += 1;
@@ -143,7 +159,7 @@ pub(super) fn cli_kube_action(args: &[String]) {
 
         "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls),
         "secret" => exec_kube_action_secret(&namespace, &app_name),
-        "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..]),
+        "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime),
         unknown => {
             eprintln!("Unknown action command: {}\n{}", unknown, more_info);
             std::process::exit(1);
@@ -222,6 +238,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
         ("hpa", "hpa", "HORIZONTAL POD AUTOSCALER"),
         ("svc", "svc", "SERVICES"),
         ("ing", "ing", "INGRESS"),
+        ("net", "net", "NETWORK"),
+        ("gate", "gate", "GATEWAY"),
         ("stateful", "statefulset", "STATEFUL SET"),
         ("pv", "pv", "PERSISTENT VOLUME"),
         ("pvc", "pvc", "PERSISTENT VOLUME CLAIM"),
@@ -248,6 +266,22 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
             } else {
                 format!("kubectl get {} --field-selector metadata.name={} -n {}", key, app, ns)
             };
+
+            if key == "net" {
+                script = if ns.is_empty() {
+                    format!("kubectl get gcpbackendpolicy --field-selector metadata.name={}", app)
+                } else {
+                    format!("kubectl get gcpbackendpolicy --field-selector metadata.name={} -n {}", app, ns)
+                };
+            }
+
+            if key == "gate" {
+                script = if ns.is_empty() {
+                    format!("kubectl get httproute {}-redirect {} --ignore-not-found", app, app)
+                } else {
+                    format!("kubectl get httproute {}-redirect {} -n {} --ignore-not-found", app, app, ns)
+                };
+            }
 
             if key == "pv" {
                 script = format!("kubectl get pv --field-selector metadata.name={}", app);
@@ -309,7 +343,69 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                     format!("kubectl get ing --field-selector metadata.name={}-grpc -n {}", app, ns)
                 };
                 let (_, ing_out) = util::exec(&ing_script, false, false);
-                out2 = ing_out.trim().to_string();
+                if !ing_out.to_lowercase().contains("no resources found") {
+                    out2 = ing_out.trim().to_string();
+                }
+            }
+
+            if key == "net" {
+                let mut entries: Vec<(String, String, String)> = Vec::new();
+                let hdrs = vec!["NAME", "AGE"];
+
+                if !out1.is_empty() {
+                    let loaded = util::table_loader(&out1, &hdrs);
+                    for row in loaded {
+                        let name = row.get("NAME").cloned().unwrap_or_default();
+                        let age = row.get("AGE").cloned().unwrap_or_default();
+                        if !name.is_empty() {
+                            entries.push(("GCPBackendPolicy".to_string(), name, age));
+                        }
+                    }
+                }
+
+                let hc_script = if ns.is_empty() {
+                    format!("kubectl get healthcheckpolicy --field-selector metadata.name={}", app)
+                } else {
+                    format!("kubectl get healthcheckpolicy --field-selector metadata.name={} -n {}", app, ns)
+                };
+                let (_, hc_out) = util::exec(&hc_script, false, false);
+                if !hc_out.to_lowercase().contains("no resources found") && !hc_out.trim().is_empty() {
+                    let loaded = util::table_loader(&hc_out, &hdrs);
+                    for row in loaded {
+                        let name = row.get("NAME").cloned().unwrap_or_default();
+                        let age = row.get("AGE").cloned().unwrap_or_default();
+                        if !name.is_empty() {
+                            entries.push(("HealthCheckPolicy".to_string(), name, age));
+                        }
+                    }
+                }
+
+                if entries.is_empty() {
+                    out1 = String::new();
+                    out2 = String::new();
+                } else {
+                    let mut max_kind = 4;
+                    let mut max_name = 4;
+                    for (k, n, _) in &entries {
+                        if k.len() > max_kind { max_kind = k.len(); }
+                        if n.len() > max_name { max_name = n.len(); }
+                    }
+
+                    let mut table_lines = Vec::new();
+                    table_lines.push(format!("{:<width_k$}   {:<width_n$}   AGE", "KIND", "NAME", width_k = max_kind, width_n = max_name));
+                    for (k, n, a) in &entries {
+                        table_lines.push(format!("{:<width_k$}   {:<width_n$}   {}", k, n, a, width_k = max_kind, width_n = max_name));
+                    }
+
+                    out1 = table_lines.join("\n");
+                    out2 = String::new();
+                }
+            }
+
+            if key == "gate" {
+                if !out1.is_empty() {
+                    out1 = format!("{}\n{}", color::cyan("HTTPRoute"), out1.trim());
+                }
             }
 
             if key == "pv" && out1.is_empty() {
@@ -361,24 +457,22 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
     let map_res = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
     let mut output_blocks = Vec::new();
 
-    for (yml_code, kube_key, title) in resource_keys {
-        if !ymls.contains(&yml_code.to_string()) {
-            continue;
+    for yml_code in ymls {
+        if let Some((_, kube_key, title)) = resource_keys.iter().find(|(c, _, _)| c == yml_code) {
+            let (out1, out2) = map_res.get(*kube_key).cloned().unwrap_or((nil_message.clone(), String::new()));
+
+            let title_colored =
+                if out1 == nil_message && (out2 == nil_message || out2.is_empty()) { color::bold_red(title) } else { color::bold_green(title) };
+
+            let body = match (!out1.is_empty() && out1 != nil_message, !out2.is_empty() && out2 != nil_message) {
+                (true, true) => format!("{}\n{}", out1, out2),
+                (true, false) => out1,
+                (false, true) => out2,
+                (false, false) => nil_message.clone(),
+            };
+
+            output_blocks.push(format!("{}\n{}", title_colored, body));
         }
-
-        let (out1, out2) = map_res.get(kube_key).cloned().unwrap_or((nil_message.clone(), String::new()));
-
-        let title_colored =
-            if out1 == nil_message && (out2 == nil_message || out2.is_empty()) { color::bold_red(title) } else { color::bold_green(title) };
-
-        let body = match (!out1.is_empty() && out1 != nil_message, !out2.is_empty() && out2 != nil_message) {
-            (true, true) => format!("{}\n{}", out1, out2),
-            (true, false) => out1,
-            (false, true) => out2,
-            (false, false) => nil_message.clone(),
-        };
-
-        output_blocks.push(format!("{}\n{}", title_colored, body));
     }
 
     util::print(output_blocks.join("\n\n"));

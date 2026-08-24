@@ -9,7 +9,6 @@
 
 use super::pod_actions;
 use crate::{color, util};
-use std::thread;
 
 // command: sq kube pods
 pub(super) fn cli_kube_pods(args: &[String]) {
@@ -26,7 +25,7 @@ pub(super) fn cli_kube_pods(args: &[String]) {
         if arg == "--help" || arg == "-h" {
             is_help = true;
             i += 1;
-        } else if arg == "--watch" {
+        } else if arg == "--watch" || arg == "-w" || arg == "watch" {
             is_watch = true;
             i += 1;
         } else if arg == "-n" || arg == "--namespace" {
@@ -58,7 +57,7 @@ usage: sq kube pods {{deploy-name|ssv}}
 
 {options}
   -n, --namespace   [+value] deploy namespace
-      --watch       stream every second"#
+  -w, --watch       stream every second"#
         ));
         return;
     }
@@ -69,14 +68,16 @@ usage: sq kube pods {{deploy-name|ssv}}
     }
 
     if is_watch {
-        let ns = namespace.clone();
-        let names = deploy_names.clone();
-        loop {
-            print!("\x1B[2J\x1B[1;1H");
-            let out = pod_actions::exec_kube_pods(&ns, &names);
-            println!("{}", out);
-            thread::sleep(std::time::Duration::from_secs(1));
+        let mut watch_args = Vec::new();
+        if !namespace.is_empty() {
+            watch_args.push(format!("-n {}", namespace));
         }
+        for name in &deploy_names {
+            watch_args.push(name.clone());
+        }
+        let inner_cmd = format!("sq kube pods {}", watch_args.join(" "));
+        let watch_cmd = format!("watch -t -n 1 \"{}\"", inner_cmd);
+        util::exec(&watch_cmd, false, true);
     } else {
         let out = pod_actions::exec_kube_pods(&namespace, &deploy_names);
         println!("{}", out);

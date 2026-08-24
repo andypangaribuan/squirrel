@@ -29,6 +29,12 @@ pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String], ym
 // command: task diff (from "sq kube action")
 pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], yml_version: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
+
+    if opt_value == "secret" {
+        help::exec_kube_secret_diff(&lines);
+        return;
+    }
+
     let script = format!("cat <<'EOF' | kubectl diff -f -\n{}\nEOF", lines);
     let (_, out) = util::exec(&script, false, false);
 
@@ -66,6 +72,8 @@ fn get_yml_lines(yml_name: &str, yml_templates: &[String], yml_version: &str) ->
         }
     }
 
+    let envs = help::get_envs(&working_dir);
+    lines = help::process_block_directives(&lines, &envs);
     lines = help::replace_with_env(lines);
     lines = help::replace_with_kyml_os_envs(lines);
 
