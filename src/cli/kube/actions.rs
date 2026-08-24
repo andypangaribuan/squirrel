@@ -10,6 +10,7 @@
 use super::{help, var};
 use crate::util;
 
+// command: task apply (from "sq kube action")
 pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String]) {
     let lines = get_yml_lines(opt_value, yml_templates);
     let script = format!("cat <<'EOF' | kubectl apply -f -\n{}\nEOF", lines);
@@ -17,6 +18,7 @@ pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String]) 
     util::print(out);
 }
 
+// command: task yml (from "sq kube action")
 pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String]) {
     let lines = get_yml_lines(opt_value, yml_templates);
     let script = format!("cat <<'EOF'\n{}\nEOF", lines);
@@ -24,6 +26,7 @@ pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String]) {
     util::print(out);
 }
 
+// command: task diff (from "sq kube action")
 pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String]) {
     let lines = get_yml_lines(opt_value, yml_templates);
     let script = format!("cat <<'EOF' | kubectl diff -f -\n{}\nEOF", lines);
@@ -36,6 +39,7 @@ pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String]) {
     util::print(filtered_lines.join("\n"));
 }
 
+// command: task delete (from "sq kube action")
 pub(super) fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String]) {
     let lines = get_yml_lines(opt_value, yml_templates);
     let script = format!("cat <<'EOF' | kubectl delete -f -\n{}\nEOF", lines);

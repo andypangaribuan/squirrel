@@ -118,6 +118,7 @@ pub(super) fn cli_kube_action(args: &[String]) {
                 eprintln!("{}", more_info);
                 std::process::exit(1);
             }
+
             let opt_val = &remains[1];
             match remains[0].as_str() {
                 "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates),
@@ -127,6 +128,7 @@ pub(super) fn cli_kube_action(args: &[String]) {
                 _ => {}
             }
         }
+
         "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls),
         "secret" => exec_kube_action_secret(&namespace, &app_name),
         "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..]),

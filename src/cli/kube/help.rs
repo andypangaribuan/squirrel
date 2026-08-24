@@ -158,6 +158,7 @@ pub(super) fn get_yml_file_path(yml_templates: &[String], working_dir: &str, opt
         if std::path::Path::new(&dep1).exists() {
             return (dep1, String::new());
         }
+
         let dep2 = format!("{}/deployment.yml", working_dir);
         if std::path::Path::new(&dep2).exists() {
             return (dep2, String::new());
