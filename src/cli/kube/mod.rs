@@ -7,31 +7,19 @@
  * All Rights Reserved.
  */
 
+mod actions;
+mod help;
+mod var;
+
 use crate::color;
 use crate::util;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-const SEARCH_FILE_MAX_LEVEL_ABOVE: usize = 4;
-const KEY_KYML_PV_NAME: &str = "KYML_PV_NAME";
-const KEY_KYML_PVC_NAME: &str = "KYML_PVC_NAME";
-const GITHUB_TEMPLATE_DIRECTORY: &str = "https://raw.githubusercontent.com/andypangaribuan/squirrel/main/template/";
-
-const COMMAND_ACTION_PODS: &[(&str, &str)] = &[
-    ("ls", "show running pods"),
-    ("watch", "stream every second of running pods"),
-    ("rollout", "rolling update of application"),
-    ("delete", "[+name] delete specific pod"),
-    ("exec", "[+name] go to shell pod (default: first pod)"),
-    ("scale", "[+int] scale deployment to [int] size"),
-    ("logs", "[+since] stream pods log, (default) since: 60m"),
-    ("events", "stream pods events"),
-];
-
 pub fn run(args: &[String]) {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
-        print_help();
+        help::print_help();
         return;
     }
 
@@ -43,19 +31,6 @@ pub fn run(args: &[String]) {
             std::process::exit(1);
         }
     }
-}
-
-fn print_help() {
-    let commands = color::bold_green("commands:");
-    util::print(format!(
-        r#"
-info : execute kubectl cli
-usage: sq kube
-
-{commands}
-  pods     show pods information
-  action   comprehensive kubectl execution"#
-    ));
 }
 
 // ============================================================================
@@ -404,8 +379,8 @@ fn cli_kube_action(args: &[String]) {
         }
     }
 
-    let working_dir = get_working_directory();
-    let envs = get_envs(&working_dir);
+    let working_dir = help::get_working_directory();
+    let envs = help::get_envs(&working_dir);
 
     if app_name.starts_with("KYML_") {
         app_name = envs.get(&app_name).cloned().unwrap_or(app_name);
@@ -416,7 +391,7 @@ fn cli_kube_action(args: &[String]) {
     }
 
     if is_help {
-        print_action_help();
+        help::print_action_help();
         return;
     }
 
@@ -438,10 +413,10 @@ fn cli_kube_action(args: &[String]) {
             }
             let opt_val = &remains[1];
             match remains[0].as_str() {
-                "apply" => exec_kube_action_apply(opt_val, &yml_templates),
-                "yml" => exec_kube_action_yml(opt_val, &yml_templates),
-                "diff" => exec_kube_action_diff(opt_val, &yml_templates),
-                "delete" => exec_kube_action_delete(opt_val, &yml_templates),
+                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates),
+                "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates),
+                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates),
+                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates),
                 _ => {}
             }
         }
@@ -453,44 +428,6 @@ fn cli_kube_action(args: &[String]) {
             std::process::exit(1);
         }
     }
-}
-
-fn print_action_help() {
-    let req_options = color::bold_green("required-options:");
-    let options = color::bold_green("options:");
-    let ymls = color::yellow("sa, cm, secret, dep, pdb, hpa, svc, ing, stateful, pv, pvc");
-    let kyml = color::yellow("KYML_");
-    let template_dir = color::yellow("'SQ_CLI_TEMPLATE_DIR'");
-    let export_cmd = color::cyan("export SQ_CLI_TEMPLATE_DIR=/path/to/your/template/directory");
-    let yml_template = color::yellow("--yml-template");
-    let csv = color::yellow("csv");
-    let sa1 = color::bold_red("sa");
-    let sa2 = color::bold_red("sa.yml");
-    let svc1 = color::bold_red("svc-rest");
-    let svc2 = color::bold_red("svc-rest.yml");
-    let github_repo = color::bold_green("https://github.com/andypangaribuan/squirrel/tree/main/template");
-
-    util::print(format!(
-        r#"
-info : comprehensive kubectl execution
-usage: sq kube action
-
-{req_options}
-  --app            [+value] application name, when value start with {kyml} then get from .env file
-  --yml            [+value|{csv}] execution of yaml file
-                   values: {ymls}
-
-{options}
-  --namespace      [+value] application namespace, when value start with {kyml} then get from .env file
-  --yml-template   [+value|{csv}] last yml file used when --yml not found
-                   e.q. {yml_template}={sa1},{svc1}
-                   try-1: search from current directory up to 4 level above
-                   try-2: search from os environment {template_dir} (directory path)
-                          [os env] {export_cmd}
-                   yml file inside directory: {sa2}, {svc2}
-                   try-3: search to github repo {github_repo}
-  --verbose        show full message on action"#
-    ));
 }
 
 fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
@@ -517,7 +454,7 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
 
     if ymls.contains(&"dep".to_string()) {
         command2_items.push(("pods", "execute pods cli".to_string()));
-        for (cmd, desc) in COMMAND_ACTION_PODS {
+        for (cmd, desc) in var::COMMAND_ACTION_PODS {
             command3_items.push((*cmd, desc.to_string()));
         }
     }
@@ -567,7 +504,7 @@ fn cli_kube_action_pods(namespace: &str, app_name: &str, args: &[String]) {
     if args.is_empty() {
         let commands_hdr = color::bold_green("commands:");
         let mut items = Vec::new();
-        for (c, d) in COMMAND_ACTION_PODS {
+        for (c, d) in var::COMMAND_ACTION_PODS {
             items.push((*c, d.to_string()));
         }
         let max_len = items.iter().map(|(c, _)| c.len()).max().unwrap_or(0);
@@ -792,42 +729,9 @@ fn exec_pods_events(namespace: &str, app_name: &str) {
 // YML ACTIONS: APPLY, YML, DIFF, DELETE, CONF, SECRET
 // ============================================================================
 
-fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
-    let script = format!("cat <<'EOF' | kubectl apply -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
-    util::print(out);
-}
-
-fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
-    let script = format!("cat <<'EOF'\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
-    util::print(out);
-}
-
-fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
-    let script = format!("cat <<'EOF' | kubectl diff -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, false, false);
-
-    let ignore_prefixes = ["diff -u -N /var/folders/", "--- /var/folders/", "+++ /var/folders/", "@@ "];
-
-    let filtered_lines: Vec<&str> = out.lines().filter(|line| !ignore_prefixes.iter().any(|prefix| line.starts_with(prefix))).collect();
-
-    util::print(filtered_lines.join("\n"));
-}
-
-fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
-    let script = format!("cat <<'EOF' | kubectl delete -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
-    util::print(out);
-}
-
 fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
-    let working_dir = get_working_directory();
-    let envs = get_envs(&working_dir);
+    let working_dir = help::get_working_directory();
+    let envs = help::get_envs(&working_dir);
 
     let nil_message = color::cyan("<NIL>");
 
@@ -935,8 +839,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 let (_, o2) = util::exec(&script2, false, false);
                 out1 = o2;
 
-                if out1.is_empty() && envs_map.contains_key(KEY_KYML_PV_NAME) {
-                    let pv_name = &envs_map[KEY_KYML_PV_NAME];
+                if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PV_NAME) {
+                    let pv_name = &envs_map[var::KEY_KYML_PV_NAME];
                     let script3 = format!("kubectl get pv --field-selector metadata.name={}", pv_name);
                     let (_, o3) = util::exec(&script3, false, false);
                     out1 = o3;
@@ -952,8 +856,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 let (_, o2) = util::exec(&script2, false, false);
                 out1 = o2;
 
-                if out1.is_empty() && envs_map.contains_key(KEY_KYML_PVC_NAME) {
-                    let pvc_name = &envs_map[KEY_KYML_PVC_NAME];
+                if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PVC_NAME) {
+                    let pvc_name = &envs_map[var::KEY_KYML_PVC_NAME];
                     let script3 = if ns.is_empty() {
                         format!("kubectl get pvc --field-selector metadata.name={}", pvc_name)
                     } else {
@@ -1096,154 +1000,3 @@ fn base64_decode(input: &str) -> Vec<u8> {
 // ============================================================================
 // ENVIRONMENT & FILE UTILITIES
 // ============================================================================
-
-fn get_working_directory() -> String {
-    std::env::current_dir().unwrap().to_string_lossy().to_string()
-}
-
-fn get_envs(working_dir: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    let env_file = format!("{}/.env", working_dir);
-    if let Ok(content) = std::fs::read_to_string(env_file) {
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
-            if let Some((k, v)) = trimmed.split_once('=') {
-                let key = k.trim().to_string();
-                let val = v.trim().trim_matches('"').trim_matches('\'').to_string();
-                map.insert(key, val);
-            }
-        }
-    }
-    map
-}
-
-fn get_kyml_os_envs() -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    for (k, v) in std::env::vars() {
-        if k.starts_with("KYML_") {
-            map.insert(k, v);
-        }
-    }
-    map
-}
-
-fn get_sq_cli_os_envs() -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    for (k, v) in std::env::vars() {
-        if k.starts_with("SQ_CLI_") {
-            map.insert(k, v);
-        }
-    }
-    map
-}
-
-fn get_yml_file_path(yml_templates: &[String], working_dir: &str, opt_val: &str, level: usize) -> (String, String) {
-    if level > SEARCH_FILE_MAX_LEVEL_ABOVE {
-        let mut yml_template = String::new();
-        for template in yml_templates {
-            if template == opt_val || template.starts_with(opt_val) {
-                yml_template = template.clone();
-                break;
-            }
-        }
-
-        if !yml_template.is_empty() {
-            if let Some(template_dir) = get_sq_cli_os_envs().get("SQ_CLI_TEMPLATE_DIR") {
-                let path1 = format!("{}/{}.yml", template_dir, yml_template);
-                if std::path::Path::new(&path1).exists() {
-                    return (path1, String::new());
-                }
-                let path2 = format!("{}/{}.yaml", template_dir, yml_template);
-                if std::path::Path::new(&path2).exists() {
-                    return (path2, String::new());
-                }
-            }
-
-            let url = format!("{}{}.yml", GITHUB_TEMPLATE_DIRECTORY, yml_template);
-            let cmd = format!("curl -s {}", url);
-            let (err, out) = util::exec(&cmd, false, false);
-            if !err && !out.is_empty() && !out.starts_with("404") {
-                return (String::new(), out);
-            }
-        }
-
-        return (String::new(), String::new());
-    }
-
-    let file_path = format!("{}/{}.yml", working_dir, opt_val);
-    if std::path::Path::new(&file_path).exists() {
-        return (file_path, String::new());
-    }
-
-    if opt_val == "dep" {
-        let dep1 = format!("{}/deploy.yml", working_dir);
-        if std::path::Path::new(&dep1).exists() {
-            return (dep1, String::new());
-        }
-        let dep2 = format!("{}/deployment.yml", working_dir);
-        if std::path::Path::new(&dep2).exists() {
-            return (dep2, String::new());
-        }
-    }
-
-    let parent_dir = match std::path::Path::new(working_dir).parent() {
-        Some(p) => p.to_string_lossy().to_string(),
-        None => return (String::new(), String::new()),
-    };
-
-    get_yml_file_path(yml_templates, &parent_dir, opt_val, level + 1)
-}
-
-fn replace_with_env(mut lines: String) -> String {
-    let envs = get_envs(&get_working_directory());
-    let mut keys: Vec<&String> = envs.keys().collect();
-    keys.sort_by_key(|b| std::cmp::Reverse(b.len()));
-
-    for key in keys {
-        if let Some(val) = envs.get(key) {
-            lines = lines.replace(&format!("${}", key), val);
-            lines = lines.replace(key.as_str(), val);
-        }
-    }
-    lines
-}
-
-fn replace_with_kyml_os_envs(mut lines: String) -> String {
-    let kyml_envs = get_kyml_os_envs();
-    for (key, val) in &kyml_envs {
-        lines = lines.replace(&format!("${}", key), val);
-    }
-    lines
-}
-
-fn get_yml_lines(yml_name: &str, yml_templates: &[String]) -> String {
-    let working_dir = get_working_directory();
-    let (yml_file, mut lines) = get_yml_file_path(yml_templates, &working_dir, yml_name, 1);
-
-    if yml_file.is_empty() && lines.is_empty() {
-        eprintln!("cannot find {}.yml file (up to {} level above)", yml_name, SEARCH_FILE_MAX_LEVEL_ABOVE);
-        std::process::exit(1);
-    }
-
-    if !yml_file.is_empty() {
-        match std::fs::read_to_string(&yml_file) {
-            Ok(content) => lines = content,
-            Err(e) => {
-                eprintln!("Error reading {}: {}", yml_file, e);
-                std::process::exit(1);
-            }
-        }
-    }
-
-    lines = replace_with_env(lines);
-    lines = replace_with_kyml_os_envs(lines);
-
-    if yml_name == "cm" || yml_name == "secret" {
-        lines = replace_with_env(lines);
-    }
-
-    lines
-}
