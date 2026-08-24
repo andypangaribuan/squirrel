@@ -74,6 +74,38 @@ pub(super) fn get_working_directory() -> String {
     std::env::current_dir().unwrap().to_string_lossy().to_string()
 }
 
+fn find_file_in_dir(dir: &str, file_name: &str) -> Option<String> {
+    let path = std::path::Path::new(dir).join(file_name);
+    if path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            return Some(content);
+        }
+    }
+    let alt_file_name =
+        if file_name.ends_with(".yml") { format!("{}yaml", &file_name[..file_name.len() - 3]) } else { file_name.to_string() };
+    let alt_path = std::path::Path::new(dir).join(&alt_file_name);
+    if alt_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&alt_path) {
+            return Some(content);
+        }
+    }
+    None
+}
+
+fn format_kyml_data(content: &str) -> String {
+    let mut formatted = String::from("\n");
+    for line in content.lines() {
+        if line.is_empty() {
+            formatted.push('\n');
+        } else {
+            formatted.push_str("  ");
+            formatted.push_str(line);
+            formatted.push('\n');
+        }
+    }
+    formatted
+}
+
 pub(super) fn get_envs(working_dir: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     let env_file = format!("{}/.env", working_dir);
@@ -91,6 +123,22 @@ pub(super) fn get_envs(working_dir: &str) -> HashMap<String, String> {
         }
     }
 
+    if !map.contains_key("KYML_CM_DATA") {
+        if let Ok(val) = std::env::var("KYML_CM_DATA") {
+            map.insert("KYML_CM_DATA".to_string(), val);
+        } else if let Some(content) = find_file_in_dir(working_dir, ".cm.yml") {
+            map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
+        }
+    }
+
+    if !map.contains_key("KYML_SECRET_DATA") {
+        if let Ok(val) = std::env::var("KYML_SECRET_DATA") {
+            map.insert("KYML_SECRET_DATA".to_string(), val);
+        } else if let Some(content) = find_file_in_dir(working_dir, ".secret.yml") {
+            map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
+        }
+    }
+
     map
 }
 
@@ -99,6 +147,20 @@ fn get_kyml_os_envs() -> HashMap<String, String> {
     for (k, v) in std::env::vars() {
         if k.starts_with("KYML_") {
             map.insert(k, v);
+        }
+    }
+
+    let working_dir = get_working_directory();
+
+    if !map.contains_key("KYML_CM_DATA") {
+        if let Some(content) = find_file_in_dir(&working_dir, ".cm.yml") {
+            map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
+        }
+    }
+
+    if !map.contains_key("KYML_SECRET_DATA") {
+        if let Some(content) = find_file_in_dir(&working_dir, ".secret.yml") {
+            map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
         }
     }
 
