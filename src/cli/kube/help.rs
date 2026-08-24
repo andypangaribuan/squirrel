@@ -115,7 +115,13 @@ fn get_kyml_os_envs() -> HashMap<String, String> {
 //     map
 // }
 
-pub(super) fn get_yml_file_path(yml_templates: &[String], working_dir: &str, opt_val: &str, level: usize) -> (String, String) {
+pub(super) fn get_yml_file_path(
+    yml_templates: &[String],
+    yml_version: &str,
+    working_dir: &str,
+    opt_val: &str,
+    level: usize,
+) -> (String, String) {
     if level > var::SEARCH_FILE_MAX_LEVEL_ABOVE {
         let mut yml_template = String::new();
         for template in yml_templates {
@@ -137,7 +143,12 @@ pub(super) fn get_yml_file_path(yml_templates: &[String], working_dir: &str, opt
             //     }
             // }
 
-            let url = format!("{}{}.yml", var::GITHUB_TEMPLATE_DIRECTORY, yml_template);
+            let url = if yml_version.is_empty() {
+                format!("{}{}.yml", var::GITHUB_TEMPLATE_DIRECTORY, yml_template)
+            } else {
+                format!("{}{}/{}.yml", var::GITHUB_TEMPLATE_DIRECTORY, yml_version, yml_template)
+            };
+
             let cmd = format!("curl -s {}", url);
             let (err, out) = util::exec(&cmd, false, false);
             if !err && !out.is_empty() && !out.starts_with("404") {
@@ -170,7 +181,7 @@ pub(super) fn get_yml_file_path(yml_templates: &[String], working_dir: &str, opt
         None => return (String::new(), String::new()),
     };
 
-    get_yml_file_path(yml_templates, &parent_dir, opt_val, level + 1)
+    get_yml_file_path(yml_templates, yml_version, &parent_dir, opt_val, level + 1)
 }
 
 pub(super) fn replace_with_env(mut lines: String) -> String {

@@ -11,24 +11,24 @@ use super::{help, var};
 use crate::util;
 
 // command: task apply (from "sq kube action")
-pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
+pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+    let lines = get_yml_lines(opt_value, yml_templates, yml_version);
     let script = format!("cat <<'EOF' | kubectl apply -f -\n{}\nEOF", lines);
     let (_, out) = util::exec(&script, true, false);
     util::print(out);
 }
 
 // command: task yml (from "sq kube action")
-pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
+pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+    let lines = get_yml_lines(opt_value, yml_templates, yml_version);
     let script = format!("cat <<'EOF'\n{}\nEOF", lines);
     let (_, out) = util::exec(&script, true, false);
     util::print(out);
 }
 
 // command: task diff (from "sq kube action")
-pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
+pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+    let lines = get_yml_lines(opt_value, yml_templates, yml_version);
     let script = format!("cat <<'EOF' | kubectl diff -f -\n{}\nEOF", lines);
     let (_, out) = util::exec(&script, false, false);
 
@@ -40,16 +40,16 @@ pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String]) {
 }
 
 // command: task delete (from "sq kube action")
-pub(super) fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String]) {
-    let lines = get_yml_lines(opt_value, yml_templates);
+pub(super) fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+    let lines = get_yml_lines(opt_value, yml_templates, yml_version);
     let script = format!("cat <<'EOF' | kubectl delete -f -\n{}\nEOF", lines);
     let (_, out) = util::exec(&script, true, false);
     util::print(out);
 }
 
-fn get_yml_lines(yml_name: &str, yml_templates: &[String]) -> String {
+fn get_yml_lines(yml_name: &str, yml_templates: &[String], yml_version: &str) -> String {
     let working_dir = help::get_working_directory();
-    let (yml_file, mut lines) = help::get_yml_file_path(yml_templates, &working_dir, yml_name, 1);
+    let (yml_file, mut lines) = help::get_yml_file_path(yml_templates, yml_version, &working_dir, yml_name, 1);
 
     if yml_file.is_empty() && lines.is_empty() {
         eprintln!("cannot find {}.yml file (up to {} level above)", yml_name, var::SEARCH_FILE_MAX_LEVEL_ABOVE);

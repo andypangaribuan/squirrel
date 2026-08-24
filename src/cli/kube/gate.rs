@@ -24,6 +24,7 @@ pub(super) fn cli_kube_action(args: &[String]) {
     let mut app_name = String::new();
     let mut ymls: Vec<String> = Vec::new();
     let mut namespace = String::new();
+    let mut yml_version = String::new();
     let mut yml_templates: Vec<String> = Vec::new();
     let mut remains = Vec::new();
 
@@ -68,6 +69,17 @@ pub(super) fn cli_kube_action(args: &[String]) {
             }
         } else if let Some(val) = arg.strip_prefix("--namespace=") {
             namespace = val.to_string();
+            i += 1;
+        } else if arg == "--yml-version" {
+            if i + 1 < args.len() {
+                yml_version = args[i + 1].clone();
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--yml-version=") {
+            yml_version = val.to_string();
             i += 1;
         } else if arg == "--yml-template" {
             if i + 1 < args.len() {
@@ -121,10 +133,10 @@ pub(super) fn cli_kube_action(args: &[String]) {
 
             let opt_val = &remains[1];
             match remains[0].as_str() {
-                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates),
-                "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates),
-                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates),
-                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates),
+                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates, &yml_version),
+                "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates, &yml_version),
+                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates, &yml_version),
+                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates, &yml_version),
                 _ => {}
             }
         }
