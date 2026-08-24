@@ -193,3 +193,46 @@ pub(super) fn replace_with_kyml_os_envs(mut lines: String) -> String {
     }
     lines
 }
+
+pub(super) fn parse_secret_data(json: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let inner = match json.split_once("\"data\"").and_then(|(_, s)| s.split_once('{')).and_then(|(_, s)| s.split_once('}')) {
+        Some((inner, _)) => inner,
+        None => return map,
+    };
+    for part in inner.split(',') {
+        if let Some((k, v)) = part.split_once(':') {
+            let key = k.trim().trim_matches('"').trim();
+            let val = v.trim().trim_matches('"').trim();
+            if !key.is_empty() && !val.is_empty() {
+                map.insert(key.to_string(), val.to_string());
+            }
+        }
+    }
+    map
+}
+
+pub(super) fn base64_decode(input: &str) -> Vec<u8> {
+    let input = input.trim_end_matches('=');
+    let mut buffer = Vec::new();
+    let mut bits = 0u32;
+    let mut count = 0;
+
+    for b in input.bytes() {
+        let val = match b {
+            b'A'..=b'Z' => b - b'A',
+            b'a'..=b'z' => b - b'a' + 26,
+            b'0'..=b'9' => b - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => continue,
+        };
+        bits = (bits << 6) | (val as u32);
+        count += 8;
+        while count >= 8 {
+            count -= 8;
+            buffer.push((bits >> count) as u8);
+        }
+    }
+    buffer
+}
