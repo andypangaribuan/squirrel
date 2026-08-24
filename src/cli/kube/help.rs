@@ -62,6 +62,14 @@ usage: sq kube action
     ));
 }
 
+pub(super) fn print_two_center(items: &[(&str, String)], max_cmd_len: usize) -> String {
+    let mut lines = Vec::new();
+    for (cmd, desc) in items {
+        lines.push(format!("  {:<max_cmd_len$}   {}", cmd, desc, max_cmd_len = max_cmd_len));
+    }
+    lines.join("\n")
+}
+
 pub(super) fn get_working_directory() -> String {
     std::env::current_dir().unwrap().to_string_lossy().to_string()
 }
