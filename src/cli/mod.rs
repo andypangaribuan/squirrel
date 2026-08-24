@@ -8,7 +8,6 @@
  */
 
 pub mod docker;
-pub mod ext;
 pub mod kube;
 pub mod taskfile;
 pub mod tunnel;

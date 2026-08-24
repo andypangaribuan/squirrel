@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+spec:
+  replicas: $KYML_POD_REPLICA
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: $KYML_APP_NAME
+  template:
+    metadata:
+      labels:
+        app: $KYML_APP_NAME
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "$KYML_POD_SAFE_TO_EVICT"
+        linkerd.io/inject: enabled
+        config.linkerd.io/proxy-cpu-request: $KYML_LINKERD_CPU_REQUEST
+        config.linkerd.io/proxy-cpu-limit: $KYML_LINKERD_CPU_LIMIT
+        config.linkerd.io/proxy-memory-request: $KYML_LINKERD_MEMORY_REQUEST
+        config.linkerd.io/proxy-memory-limit: $KYML_LINKERD_MEMORY_LIMIT
+        config.linkerd.io/skip-outbound-ports: "5432"
+    spec:
+      priorityClassName: $KYML_PRIORITY_CLASS
+      terminationGracePeriodSeconds: 90
+      serviceAccountName: $KYML_APP_NAME
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app: $KYML_APP_NAME
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app: $KYML_APP_NAME
+      containers:
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.25.2
+          args:
+            - "--structured-logs"
+            - "--port=5432"
+            - "$KYML_GCP_PROJECT_ID:$KYML_GCP_DB_REGION:$KYML_GCP_DB_INSTANCE_ID"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+
+        - name: $KYML_APP_NAME
+          image: $KYML_IMAGE_PATH:$KYML_IMAGE_VERSION
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: $KYML_HTTP_PORT_NAME
+              containerPort: $KYML_HTTP_PORT_NUMBER
+          envFrom:
+            - secretRef:
+                name: $KYML_APP_NAME
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: $KYML_CPU_REQUEST
+              memory: $KYML_MEMORY_REQUEST
+              ephemeral-storage: $KYML_EPHEMERAL_STORAGE
+            limits:
+              ephemeral-storage: $KYML_EPHEMERAL_STORAGE
+          startupProbe:
+            httpGet:
+              path: $KYML_HTTP_PROBE
+              port: $KYML_HTTP_PORT_NAME
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            successThreshold: 1
+            failureThreshold: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: $KYML_HTTP_PROBE
+              port: $KYML_HTTP_PORT_NAME
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: $KYML_HTTP_PROBE
+              port: $KYML_HTTP_PORT_NAME
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/app/x", "--sleep", "30s"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000

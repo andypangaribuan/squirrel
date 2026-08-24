@@ -78,6 +78,13 @@ function build {
 }
 
 
+#: build dev and move
+function bd {
+  cargo build
+  cp target/debug/sq /usr/local/bin/sq
+}
+
+
 #: move sq into /usr/local/bin/sq
 function move {
   sudo mv .releases/sq /usr/local/bin/sq

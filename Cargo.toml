@@ -31,4 +31,4 @@ debug = "full"
 
 [dependencies]
 # rmod = { path = "/Users/apangaribuan/ark/repo/gh/rmod" }
-rmod = { git = "https://github.com/andypangaribuan/rmod", tag = "v1.0.27" }
+rmod = { git = "https://github.com/andypangaribuan/rmod", tag = "v1.0.35" }

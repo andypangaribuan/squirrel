@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Copyright (c) 2025.
+# Created by Andy Pangaribuan. All Rights Reserved.
+# This product is protected by copyright and distributed under
+# licenses restricting copying, distribution and decompilation.
+
+. ~/ark/files/k8s/script/base.sh
+
+sq kube action \
+  --namespace KYML_NAMESPACE \
+  --app KYML_APP_NAME \
+  --yml sa,secret,dep,pdb,hpa,svc,ing \
+  --yml-template sa,secret,pdb,hpa,svc-http \
+  "$@"

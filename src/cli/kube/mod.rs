@@ -536,13 +536,13 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
         msg.push('\n');
     } else {
         msg.push_str(&format!("\n{}\n", commands_hdr));
-        msg.push_str(&format!("  apply, yml, diff, delete  →  {}\n", ys));
+        msg.push_str(&format!("  apply, yml, diff, delete  {}  {}\n", color::bold_red("▶︎"), ys));
     }
 
     msg.push_str(&format!("\n{}\n", print_two_center(&command2_items, max_cmd_len)));
 
     if !command3_items.is_empty() {
-        msg.push_str(&format!("\n{} {} subcommands:\n", pods_subcommand_hdr, color::bold_green("subcommands:")));
+        msg.push_str(&format!("\n{} {}\n", pods_subcommand_hdr, color::bold_green("subcommands:")));
         msg.push_str(&print_two_center(&command3_items, max_cmd_len));
     }
 
