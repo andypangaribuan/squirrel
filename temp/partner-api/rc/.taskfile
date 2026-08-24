@@ -12,4 +12,5 @@ sq kube action \
   --app KYML_APP_NAME \
   --yml sa,secret,dep,pdb,hpa,svc,ing \
   --yml-template sa,secret,pdb,hpa,svc-http \
+  --yml-version v2a \
   "$@"
