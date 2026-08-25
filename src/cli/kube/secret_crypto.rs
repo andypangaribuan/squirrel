@@ -21,7 +21,7 @@ use std::path::Path;
 pub const ENCRYPTED_HEADER_PREFIX: &str = "# SQUIRREL:ENCRYPTED:v1:";
 
 pub fn is_encrypted(content: &str) -> bool {
-    content.lines().next().map_or(false, |line| line.trim().starts_with(ENCRYPTED_HEADER_PREFIX))
+    content.lines().next().is_some_and(|line| line.trim().starts_with(ENCRYPTED_HEADER_PREFIX))
 }
 
 pub fn read_password(prompt_msg: &str) -> Result<String, String> {
