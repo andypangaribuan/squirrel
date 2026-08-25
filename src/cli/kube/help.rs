@@ -81,18 +81,14 @@ pub(super) fn get_working_directory() -> String {
 
 fn find_file_in_dir(dir: &str, file_name: &str) -> Option<String> {
     let path = std::path::Path::new(dir).join(file_name);
-    if path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            return Some(content);
-        }
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        return Some(content);
     }
     let alt_file_name =
         if file_name.ends_with(".yml") { format!("{}yaml", &file_name[..file_name.len() - 3]) } else { file_name.to_string() };
     let alt_path = std::path::Path::new(dir).join(&alt_file_name);
-    if alt_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&alt_path) {
-            return Some(content);
-        }
+    if let Ok(content) = std::fs::read_to_string(&alt_path) {
+        return Some(content);
     }
     None
 }
@@ -134,16 +130,16 @@ pub(super) fn get_envs(working_dir: &str) -> HashMap<String, String> {
         }
     }
 
-    if !map.contains_key("KYML_CM_DATA") {
-        if let Some(content) = find_file_in_dir(working_dir, ".cm.yml") {
-            map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
-        }
+    if !map.contains_key("KYML_CM_DATA")
+        && let Some(content) = find_file_in_dir(working_dir, ".cm.yml")
+    {
+        map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
     }
 
-    if !map.contains_key("KYML_SECRET_DATA") {
-        if let Some(content) = find_file_in_dir(working_dir, ".secret.yml") {
-            map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
-        }
+    if !map.contains_key("KYML_SECRET_DATA")
+        && let Some(content) = find_file_in_dir(working_dir, ".secret.yml")
+    {
+        map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
     }
 
     map
@@ -159,16 +155,16 @@ fn get_kyml_os_envs() -> HashMap<String, String> {
 
     let working_dir = get_working_directory();
 
-    if !map.contains_key("KYML_CM_DATA") {
-        if let Some(content) = find_file_in_dir(&working_dir, ".cm.yml") {
-            map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
-        }
+    if !map.contains_key("KYML_CM_DATA")
+        && let Some(content) = find_file_in_dir(&working_dir, ".cm.yml")
+    {
+        map.insert("KYML_CM_DATA".to_string(), format_kyml_data(&content));
     }
 
-    if !map.contains_key("KYML_SECRET_DATA") {
-        if let Some(content) = find_file_in_dir(&working_dir, ".secret.yml") {
-            map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
-        }
+    if !map.contains_key("KYML_SECRET_DATA")
+        && let Some(content) = find_file_in_dir(&working_dir, ".secret.yml")
+    {
+        map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
     }
 
     map
@@ -361,11 +357,11 @@ pub(super) fn process_block_directives(content: &str, envs: &HashMap<String, Str
 
                 match dir.action.as_deref() {
                     Some("DELETE_LINE") => {
-                        if let Some(val) = effective_val {
-                            if !val.trim().is_empty() {
-                                let clean_line = format!("{}{}{}", &line[..start_idx], val, &line[end_idx..]);
-                                result_lines.push(clean_line);
-                            }
+                        if let Some(val) = effective_val
+                            && !val.trim().is_empty()
+                        {
+                            let clean_line = format!("{}{}{}", &line[..start_idx], val, &line[end_idx..]);
+                            result_lines.push(clean_line);
                         }
                         i += 1;
                         continue;
@@ -391,9 +387,7 @@ pub(super) fn process_block_directives(content: &str, envs: &HashMap<String, Str
 
                             while i < raw_lines.len() {
                                 let next_line = raw_lines[i];
-                                if next_line.trim().is_empty() {
-                                    i += 1;
-                                } else if get_indent(next_line) > base_indent {
+                                if next_line.trim().is_empty() || get_indent(next_line) > base_indent {
                                     i += 1;
                                 } else {
                                     break;
@@ -436,10 +430,7 @@ fn find_directive_bounds(line: &str) -> Option<(usize, usize)> {
 }
 
 fn parse_directive(directive_str: &str) -> Option<Directive> {
-    let inner = directive_str
-        .strip_prefix("#{$")
-        .or_else(|| directive_str.strip_prefix("{$"))?
-        .strip_suffix('}')?;
+    let inner = directive_str.strip_prefix("#{$").or_else(|| directive_str.strip_prefix("{$"))?.strip_suffix('}')?;
 
     let parts: Vec<&str> = inner.split(',').collect();
     if parts.is_empty() {
@@ -459,11 +450,7 @@ fn parse_directive(directive_str: &str) -> Option<Directive> {
         }
     }
 
-    Some(Directive {
-        var_name,
-        default_val,
-        action,
-    })
+    Some(Directive { var_name, default_val, action })
 }
 
 fn get_indent(line: &str) -> usize {
@@ -512,11 +499,7 @@ pub(super) fn exec_kube_secret_diff(local_yaml: &str, cloud_sdk_container: &str)
     };
 
     let (err, out) = util::exec_kube(&script, cloud_sdk_container, false, false);
-    let cluster_raw_map = if !err && !out.contains("(NotFound)") && !out.is_empty() {
-        parse_secret_data(&out)
-    } else {
-        HashMap::new()
-    };
+    let cluster_raw_map = if !err && !out.contains("(NotFound)") && !out.is_empty() { parse_secret_data(&out) } else { HashMap::new() };
 
     let mut cluster_map = HashMap::new();
     for (k, v) in cluster_raw_map {
@@ -630,11 +613,7 @@ pub(super) fn parse_yaml_secret_map(yaml_content: &str) -> HashMap<String, Strin
                                 block_indent = Some(b_indent);
                             }
                             let b_indent_val = block_indent.unwrap();
-                            let content_line = if b_line.len() >= b_indent_val {
-                                &b_line[b_indent_val..]
-                            } else {
-                                b_line.trim()
-                            };
+                            let content_line = if b_line.len() >= b_indent_val { &b_line[b_indent_val..] } else { b_line.trim() };
                             block_lines.push(content_line);
                             i += 1;
                         }

@@ -176,11 +176,7 @@ pub(super) fn cli_kube_action(args: &[String]) {
     if !cluster_name.is_empty() {
         let get_current_ctx = |cloud_container: &str| -> String {
             let (err, out) = util::exec_kube("kubectl config current-context", cloud_container, false, false);
-            if err {
-                String::new()
-            } else {
-                out.trim().to_string()
-            }
+            if err { String::new() } else { out.trim().to_string() }
         };
 
         let mut active_ctx = get_current_ctx(&cloud_sdk_container);
@@ -240,7 +236,9 @@ pub(super) fn cli_kube_action(args: &[String]) {
 
         "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls, &cloud_sdk_container),
         "secret" => exec_kube_action_secret(&namespace, &app_name, &cloud_sdk_container),
-        "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime, &cloud_sdk_container),
+        "pods" => {
+            pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime, &cloud_sdk_container)
+        }
         unknown => {
             eprintln!("Unknown action command: {}\n{}", unknown, more_info);
             std::process::exit(1);
@@ -469,8 +467,12 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                     let mut max_kind = 4;
                     let mut max_name = 4;
                     for (k, n, _) in &entries {
-                        if k.len() > max_kind { max_kind = k.len(); }
-                        if n.len() > max_name { max_name = n.len(); }
+                        if k.len() > max_kind {
+                            max_kind = k.len();
+                        }
+                        if n.len() > max_name {
+                            max_name = n.len();
+                        }
                     }
 
                     let mut table_lines = Vec::new();
@@ -484,10 +486,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                 }
             }
 
-            if key == "gate" {
-                if !out1.is_empty() {
-                    out1 = format!("{}\n{}", color::cyan("HTTPRoute"), out1.trim());
-                }
+            if key == "gate" && !out1.is_empty() {
+                out1 = format!("{}\n{}", color::cyan("HTTPRoute"), out1.trim());
             }
 
             if key == "pv" && out1.is_empty() {
@@ -544,8 +544,11 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
         if let Some((_, kube_key, title)) = resource_keys.iter().find(|(c, _, _)| c == yml_code) {
             let (out1, out2) = map_res.get(*kube_key).cloned().unwrap_or((nil_message.clone(), String::new()));
 
-            let title_colored =
-                if out1 == nil_message && (out2 == nil_message || out2.is_empty()) { color::bold_red(title) } else { color::bold_green(title) };
+            let title_colored = if out1 == nil_message && (out2 == nil_message || out2.is_empty()) {
+                color::bold_red(title)
+            } else {
+                color::bold_green(title)
+            };
 
             let body = match (!out1.is_empty() && out1 != nil_message, !out2.is_empty() && out2 != nil_message) {
                 (true, true) => format!("{}\n{}", out1, out2),
