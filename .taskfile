@@ -70,11 +70,23 @@ function rmd {
 #: build the cli app
 function build {
   mkdir -p .releases
-  rm -rf .releases/sq
+  rm -rf .releases/sq-darwin-arm64
   cargo build --release
-  mv target/release/sq .releases/
-  chmod +x .releases/sq
+  mv target/release/sq .releases/sq-darwin-arm64
+  chmod +x .releases/sq-darwin-arm64
   rm -rf target
+}
+
+#: build the cli app for linux amd64
+function build64 {
+  mkdir -p .releases
+  rm -rf .releases/sq-linux-x86_64
+  rustup target add x86_64-unknown-linux-musl
+  cargo install cross --git https://github.com/cross-rs/cross
+  cross build --target x86_64-unknown-linux-musl --release
+  mv target/x86_64-unknown-linux-musl/release/sq .releases/sq-linux-x86_64 
+  chmod +x .releases/sq-linux-x86_64
+
 }
 
 
