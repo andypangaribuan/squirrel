@@ -17,6 +17,7 @@ pub(super) fn cli_kube_pods(args: &[String]) {
     let mut is_help = false;
     let mut is_watch = false;
     let mut namespace = String::new();
+    let mut cloud_sdk_container = String::new();
     let mut deploy_names = Vec::new();
 
     let mut i = 0;
@@ -39,6 +40,17 @@ pub(super) fn cli_kube_pods(args: &[String]) {
         } else if let Some(val) = arg.strip_prefix("--namespace=") {
             namespace = val.to_string();
             i += 1;
+        } else if arg == "--cloud-sdk-container" {
+            if i + 1 < args.len() {
+                cloud_sdk_container = args[i + 1].clone();
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--cloud-sdk-container=") {
+            cloud_sdk_container = val.to_string();
+            i += 1;
         } else if arg.starts_with('-') {
             eprintln!("unknown option: {}\n{}", arg, more_info);
             std::process::exit(1);
@@ -56,8 +68,9 @@ info : show pods information
 usage: sq kube pods {{deploy-name|ssv}}
 
 {options}
-  -n, --namespace   [+value] deploy namespace
-  -w, --watch       stream every second"#
+  -n, --namespace            [+value] deploy namespace
+  -w, --watch                stream every second
+      --cloud-sdk-container  [+value] cloud sdk container name"#
         ));
         return;
     }
@@ -72,6 +85,9 @@ usage: sq kube pods {{deploy-name|ssv}}
         if !namespace.is_empty() {
             watch_args.push(format!("-n {}", namespace));
         }
+        if !cloud_sdk_container.is_empty() {
+            watch_args.push(format!("--cloud-sdk-container {}", cloud_sdk_container));
+        }
         for name in &deploy_names {
             watch_args.push(name.clone());
         }
@@ -79,7 +95,7 @@ usage: sq kube pods {{deploy-name|ssv}}
         let watch_cmd = format!("watch -t -n 1 \"{}\"", inner_cmd);
         util::exec(&watch_cmd, false, true);
     } else {
-        let out = pod_actions::exec_kube_pods(&namespace, &deploy_names);
+        let out = pod_actions::exec_kube_pods(&namespace, &deploy_names, &cloud_sdk_container);
         println!("{}", out);
     }
 }

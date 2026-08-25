@@ -28,6 +28,9 @@ pub(super) fn cli_kube_action(args: &[String]) {
     let mut yml_templates: Vec<String> = Vec::new();
     let mut log_excludes: Vec<String> = Vec::new();
     let mut hide_app_datetime = false;
+    let mut cloud_sdk_container = String::new();
+    let mut cluster_name = String::new();
+    let mut kubeconfig_path = String::new();
     let mut remains = Vec::new();
 
     let mut i = 0;
@@ -41,6 +44,39 @@ pub(super) fn cli_kube_action(args: &[String]) {
             i += 1;
         } else if arg == "--hide-app-datetime" {
             hide_app_datetime = true;
+            i += 1;
+        } else if arg == "--cloud-sdk-container" {
+            if i + 1 < args.len() {
+                cloud_sdk_container = args[i + 1].clone();
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--cloud-sdk-container=") {
+            cloud_sdk_container = val.to_string();
+            i += 1;
+        } else if arg == "--cluster-name" {
+            if i + 1 < args.len() {
+                cluster_name = args[i + 1].clone();
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--cluster-name=") {
+            cluster_name = val.to_string();
+            i += 1;
+        } else if arg == "--kubeconfig-path" {
+            if i + 1 < args.len() {
+                kubeconfig_path = args[i + 1].clone();
+                i += 2;
+            } else {
+                eprintln!("{}", more_info);
+                std::process::exit(1);
+            }
+        } else if let Some(val) = arg.strip_prefix("--kubeconfig-path=") {
+            kubeconfig_path = val.to_string();
             i += 1;
         } else if arg == "--app" {
             if i + 1 < args.len() {
@@ -125,6 +161,51 @@ pub(super) fn cli_kube_action(args: &[String]) {
         namespace = envs.get(&namespace).cloned().unwrap_or(namespace);
     }
 
+    if cloud_sdk_container.starts_with("KYML_") {
+        cloud_sdk_container = envs.get(&cloud_sdk_container).cloned().unwrap_or_default();
+    }
+
+    if cluster_name.starts_with("KYML_") {
+        cluster_name = envs.get(&cluster_name).cloned().unwrap_or_default();
+    }
+
+    if kubeconfig_path.starts_with("KYML_") {
+        kubeconfig_path = envs.get(&kubeconfig_path).cloned().unwrap_or_default();
+    }
+
+    if !cluster_name.is_empty() {
+        let get_current_ctx = |cloud_container: &str| -> String {
+            let (err, out) = util::exec_kube("kubectl config current-context", cloud_container, false, false);
+            if err {
+                String::new()
+            } else {
+                out.trim().to_string()
+            }
+        };
+
+        let mut active_ctx = get_current_ctx(&cloud_sdk_container);
+        if active_ctx != cluster_name {
+            if !kubeconfig_path.is_empty() {
+                unsafe {
+                    std::env::set_var("KUBECONFIG", &kubeconfig_path);
+                }
+                active_ctx = get_current_ctx(&cloud_sdk_container);
+            }
+            if active_ctx != cluster_name {
+                eprintln!(
+                    "Cluster name mismatch: active context is '{}', but expected '{}'",
+                    if active_ctx.is_empty() { "none" } else { &active_ctx },
+                    cluster_name
+                );
+                std::process::exit(1);
+            }
+        }
+    } else if !kubeconfig_path.is_empty() {
+        unsafe {
+            std::env::set_var("KUBECONFIG", &kubeconfig_path);
+        }
+    }
+
     if is_help {
         help::print_action_help();
         return;
@@ -149,17 +230,17 @@ pub(super) fn cli_kube_action(args: &[String]) {
 
             let opt_val = &remains[1];
             match remains[0].as_str() {
-                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates, &yml_version),
+                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
                 "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates, &yml_version),
-                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates, &yml_version),
-                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates, &yml_version),
+                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
+                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
                 _ => {}
             }
         }
 
-        "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls),
-        "secret" => exec_kube_action_secret(&namespace, &app_name),
-        "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime),
+        "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls, &cloud_sdk_container),
+        "secret" => exec_kube_action_secret(&namespace, &app_name, &cloud_sdk_container),
+        "pods" => pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime, &cloud_sdk_container),
         unknown => {
             eprintln!("Unknown action command: {}\n{}", unknown, more_info);
             std::process::exit(1);
@@ -223,7 +304,7 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
     util::print(msg);
 }
 
-fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
+fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud_sdk_container: &str) {
     let working_dir = help::get_working_directory();
     let envs = help::get_envs(&working_dir);
 
@@ -257,6 +338,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
         let app = app_name.to_string();
         let key = kube_key.to_string();
         let envs_map = envs.clone();
+        let cloud_container = cloud_sdk_container.to_string();
         let res_clone = Arc::clone(&results);
 
         handles.push(thread::spawn(move || {
@@ -287,7 +369,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 script = format!("kubectl get pv --field-selector metadata.name={}", app);
             }
 
-            let (err, mut out1) = util::exec(&script, false, false);
+            let (err, mut out1) = util::exec_kube(&script, &cloud_container, false, false);
             if err || out1.to_lowercase().contains("no resources found") {
                 out1 = String::new();
             }
@@ -306,7 +388,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                         } else {
                             format!("kubectl get ep --field-selector metadata.name={} -n {}", app, ns)
                         };
-                        let (_, ep_out) = util::exec(&ep_script, false, false);
+                        let (_, ep_out) = util::exec_kube(&ep_script, &cloud_container, false, false);
                         if !ep_out.is_empty() {
                             let ep_hdrs = vec!["NAME", "ENDPOINTS", "AGE"];
                             let ep_loaded = util::table_loader(&ep_out, &ep_hdrs);
@@ -342,7 +424,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 } else {
                     format!("kubectl get ing --field-selector metadata.name={}-grpc -n {}", app, ns)
                 };
-                let (_, ing_out) = util::exec(&ing_script, false, false);
+                let (_, ing_out) = util::exec_kube(&ing_script, &cloud_container, false, false);
                 if !ing_out.to_lowercase().contains("no resources found") {
                     out2 = ing_out.trim().to_string();
                 }
@@ -368,7 +450,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 } else {
                     format!("kubectl get healthcheckpolicy --field-selector metadata.name={} -n {}", app, ns)
                 };
-                let (_, hc_out) = util::exec(&hc_script, false, false);
+                let (_, hc_out) = util::exec_kube(&hc_script, &cloud_container, false, false);
                 if !hc_out.to_lowercase().contains("no resources found") && !hc_out.trim().is_empty() {
                     let loaded = util::table_loader(&hc_out, &hdrs);
                     for row in loaded {
@@ -410,13 +492,13 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
 
             if key == "pv" && out1.is_empty() {
                 let script2 = format!("kubectl get pv --field-selector metadata.name={}-pv", app);
-                let (_, o2) = util::exec(&script2, false, false);
+                let (_, o2) = util::exec_kube(&script2, &cloud_container, false, false);
                 out1 = o2;
 
                 if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PV_NAME) {
                     let pv_name = &envs_map[var::KEY_KYML_PV_NAME];
                     let script3 = format!("kubectl get pv --field-selector metadata.name={}", pv_name);
-                    let (_, o3) = util::exec(&script3, false, false);
+                    let (_, o3) = util::exec_kube(&script3, &cloud_container, false, false);
                     out1 = o3;
                 }
             }
@@ -427,7 +509,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                 } else {
                     format!("kubectl get pvc --field-selector metadata.name={}-pvc -n {}", app, ns)
                 };
-                let (_, o2) = util::exec(&script2, false, false);
+                let (_, o2) = util::exec_kube(&script2, &cloud_container, false, false);
                 out1 = o2;
 
                 if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PVC_NAME) {
@@ -437,16 +519,17 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
                     } else {
                         format!("kubectl get pvc --field-selector metadata.name={} -n {}", pvc_name, ns)
                     };
-                    let (_, o3) = util::exec(&script3, false, false);
+                    let (_, o3) = util::exec_kube(&script3, &cloud_container, false, false);
                     out1 = o3;
                 }
             }
 
-            let res1 = if out1.trim().is_empty() { nil_msg.clone() } else { out1.trim().to_string() };
-            let res2 = out2.trim().to_string();
+            if out1.is_empty() {
+                out1 = nil_msg.clone();
+            }
 
             let mut guard = res_clone.lock().unwrap();
-            guard.insert(key, (res1, res2));
+            guard.insert(key, (out1, out2));
         }));
     }
 
@@ -476,17 +559,16 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String]) {
     }
 
     util::print(output_blocks.join("\n\n"));
-    std::process::exit(0);
 }
 
-fn exec_kube_action_secret(namespace: &str, app_name: &str) {
+fn exec_kube_action_secret(namespace: &str, app_name: &str, cloud_sdk_container: &str) {
     let script = if namespace.is_empty() {
         format!("kubectl get secret {} -o json", app_name)
     } else {
         format!("kubectl get secret {} -n {} -o json", app_name, namespace)
     };
 
-    let (err, out) = util::exec(&script, false, false);
+    let (err, out) = util::exec_kube(&script, cloud_sdk_container, false, false);
     if err || out.contains("(NotFound)") {
         util::print(out);
         std::process::exit(1);

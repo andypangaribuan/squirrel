@@ -14,5 +14,13 @@ sq kube action \
   --log-exclude "defer: 200 OK GET /healthz handler" \
   --log-exclude "%cron refresh_db: processed, duration%" \
   --log-exclude "%cron refresh_config_appdata: processed, duration%" \
+  --cloud-sdk-container KYML_CLOUD_SDK_CONTAINER \
+  --cluster-name KYML_CLUSTER_NAME \
+  --kubeconfig-path KYML_KUBECONFIG_PATH \
   --hide-app-datetime \
   "$@"
+
+
+  # --cloud-sdk-container KYML_CLOUD_SDK_CONTAINER \
+  # --cluster-name KYML_CLUSTER_NAME \
+  # --kubeconfig-path KYML_KUBECONFIG_PATH \

@@ -14,6 +14,118 @@ pub fn print<T: AsRef<str>>(text: T) {
     println!("{}", text.as_ref().trim_matches('\n'));
 }
 
+pub fn wrap_kube_cmd(cmd: &str, cloud_sdk_container: &str, is_interactive: bool) -> String {
+    if cloud_sdk_container.is_empty() {
+        return cmd.to_string();
+    }
+
+    let (first_part, rest_pipe) = match cmd.split_once('|') {
+        Some((first, rest)) => (first.trim(), format!(" | {}", rest.trim())),
+        None => (cmd.trim(), String::new()),
+    };
+
+    let flag = if is_interactive { "-it" } else { "-i" };
+
+    format!("docker exec {} {} sh -c \"{}\"{}", flag, cloud_sdk_container, first_part.replace('"', "\\\""), rest_pipe)
+}
+
+pub fn exec_kube(cmd: &str, cloud_sdk_container: &str, check: bool, show_output: bool) -> (bool, String) {
+    let wrapped = wrap_kube_cmd(cmd, cloud_sdk_container, show_output);
+    exec(&wrapped, check, show_output)
+}
+
+pub fn exec_stdin(cmd: &str, stdin_data: &str, check: bool, show_output: bool) -> (bool, String) {
+    let mut command = Command::new("sh");
+    command.arg("-c").arg(cmd);
+    command.stdin(Stdio::piped());
+
+    if show_output {
+        command.stdout(Stdio::inherit());
+        command.stderr(Stdio::inherit());
+
+        let mut child = match command.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Error spawning command '{}': {}", cmd, e);
+                if check {
+                    std::process::exit(1);
+                }
+                return (true, String::new());
+            }
+        };
+
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(stdin_data.as_bytes());
+        }
+
+        let status = child.wait();
+        let is_err = match status {
+            Ok(s) => !s.success(),
+            Err(e) => {
+                eprintln!("Error waiting for command '{}': {}", cmd, e);
+                true
+            }
+        };
+
+        if is_err && check {
+            std::process::exit(1);
+        }
+
+        (is_err, String::new())
+    } else {
+        let mut child = match command.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                let err_msg = format!("Error spawning command '{}': {}", cmd, e);
+                if check {
+                    eprintln!("{}", err_msg);
+                    std::process::exit(1);
+                }
+                return (true, err_msg);
+            }
+        };
+
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(stdin_data.as_bytes());
+        }
+
+        let output = child.wait_with_output();
+        match output {
+            Ok(out) => {
+                let is_err = !out.status.success();
+                let stdout_str = String::from_utf8_lossy(&out.stdout).to_string();
+                let stderr_str = String::from_utf8_lossy(&out.stderr).to_string();
+
+                let combined_output = if !stdout_str.is_empty() { stdout_str } else { stderr_str };
+
+                if is_err && check {
+                    if !combined_output.is_empty() {
+                        eprint!("{}", combined_output);
+                    }
+                    std::process::exit(1);
+                }
+
+                (is_err, combined_output)
+            }
+            Err(e) => {
+                let err_msg = format!("Error executing command '{}': {}", cmd, e);
+                if check {
+                    eprintln!("{}", err_msg);
+                    std::process::exit(1);
+                }
+                (true, err_msg)
+            }
+        }
+    }
+}
+
+pub fn exec_kube_stdin(cmd: &str, stdin_data: &str, cloud_sdk_container: &str, check: bool, show_output: bool) -> (bool, String) {
+    let wrapped = wrap_kube_cmd(cmd, cloud_sdk_container, show_output);
+    exec_stdin(&wrapped, stdin_data, check, show_output)
+}
+
 pub fn exec(cmd: &str, check: bool, show_output: bool) -> (bool, String) {
     let mut command = Command::new("sh");
     command.arg("-c").arg(cmd);

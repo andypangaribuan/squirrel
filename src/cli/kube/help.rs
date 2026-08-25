@@ -60,6 +60,9 @@ usage: sq kube action
                    try-3: search to github repo {github_repo}
   --log-exclude    [+value] exclude log matching pattern (repeatable)
   --hide-app-datetime hide application log datetime body
+  --cloud-sdk-container [+value] container name of cloud-sdk for executing kubectl
+  --cluster-name   [+value] expected cluster name of active context
+  --kubeconfig-path [+value] path to kubeconfig file (e.g. /path/to/config.yml)
   --verbose        show full message on action"#
     ));
 }
@@ -477,7 +480,7 @@ fn get_indent(line: &str) -> usize {
     count
 }
 
-pub(super) fn exec_kube_secret_diff(local_yaml: &str) {
+pub(super) fn exec_kube_secret_diff(local_yaml: &str, cloud_sdk_container: &str) {
     let local_map = parse_yaml_secret_map(local_yaml);
 
     let mut app_name = String::new();
@@ -508,7 +511,7 @@ pub(super) fn exec_kube_secret_diff(local_yaml: &str) {
         format!("kubectl get secret {} -n {} -o json", app_name, namespace)
     };
 
-    let (err, out) = util::exec(&script, false, false);
+    let (err, out) = util::exec_kube(&script, cloud_sdk_container, false, false);
     let cluster_raw_map = if !err && !out.contains("(NotFound)") && !out.is_empty() {
         parse_secret_data(&out)
     } else {

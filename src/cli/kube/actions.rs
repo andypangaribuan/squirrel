@@ -11,32 +11,28 @@ use super::{help, var};
 use crate::util;
 
 // command: task apply (from "sq kube action")
-pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String], yml_version: &str, cloud_sdk_container: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
-    let script = format!("cat <<'EOF' | kubectl apply -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
+    let (_, out) = util::exec_kube_stdin("kubectl apply -f -", &lines, cloud_sdk_container, true, false);
     util::print(out);
 }
 
 // command: task yml (from "sq kube action")
 pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String], yml_version: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
-    let script = format!("cat <<'EOF'\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
-    util::print(out);
+    util::print(lines);
 }
 
 // command: task diff (from "sq kube action")
-pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], yml_version: &str, cloud_sdk_container: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
 
     if opt_value == "secret" {
-        help::exec_kube_secret_diff(&lines);
+        help::exec_kube_secret_diff(&lines, cloud_sdk_container);
         return;
     }
 
-    let script = format!("cat <<'EOF' | kubectl diff -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, false, false);
+    let (_, out) = util::exec_kube_stdin("kubectl diff -f -", &lines, cloud_sdk_container, false, false);
 
     let ignore_prefixes = ["diff -u -N /var/folders/", "--- /var/folders/", "+++ /var/folders/", "@@ "];
 
@@ -46,10 +42,9 @@ pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], y
 }
 
 // command: task delete (from "sq kube action")
-pub(super) fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String], yml_version: &str) {
+pub(super) fn exec_kube_action_delete(opt_value: &str, yml_templates: &[String], yml_version: &str, cloud_sdk_container: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
-    let script = format!("cat <<'EOF' | kubectl delete -f -\n{}\nEOF", lines);
-    let (_, out) = util::exec(&script, true, false);
+    let (_, out) = util::exec_kube_stdin("kubectl delete -f -", &lines, cloud_sdk_container, true, false);
     util::print(out);
 }
 
