@@ -19,8 +19,3 @@ sq kube action \
   --kubeconfig-path KYML_KUBECONFIG_PATH \
   --hide-app-datetime \
   "$@"
-
-
-  # --cloud-sdk-container KYML_CLOUD_SDK_CONTAINER \
-  # --cluster-name KYML_CLUSTER_NAME \
-  # --kubeconfig-path KYML_KUBECONFIG_PATH \

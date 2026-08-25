@@ -30,5 +30,10 @@ debug = "full"
 
 
 [dependencies]
-# rmod = { path = "/Users/apangaribuan/ark/repo/gh/rmod" }
 rmod = { git = "https://github.com/andypangaribuan/rmod", tag = "v1.0.35" }
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+rand = "0.8"
+base64 = "0.22"
+rpassword = "7.3"
+sha2 = "0.10"

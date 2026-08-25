@@ -7,7 +7,7 @@
  * All Rights Reserved.
  */
 
-use super::{actions, help, pod_actions, var};
+use super::{actions, help, pod_actions, secret_crypto, var};
 use crate::{color, util};
 use std::{
     collections::HashMap,
@@ -150,6 +150,16 @@ pub(super) fn cli_kube_action(args: &[String]) {
         }
     }
 
+    if is_help {
+        help::print_action_help();
+        return;
+    }
+
+    if remains.is_empty() {
+        exec_kube_action_show(is_verbose, &ymls);
+        return;
+    }
+
     let working_dir = help::get_working_directory();
     let envs = help::get_envs(&working_dir);
 
@@ -202,19 +212,9 @@ pub(super) fn cli_kube_action(args: &[String]) {
         }
     }
 
-    if is_help {
-        help::print_action_help();
-        return;
-    }
-
     if app_name.is_empty() || ymls.is_empty() {
         eprintln!("{}", more_info);
         std::process::exit(1);
-    }
-
-    if remains.is_empty() {
-        exec_kube_action_show(is_verbose, &ymls);
-        return;
     }
 
     match remains[0].as_str() {
@@ -235,7 +235,29 @@ pub(super) fn cli_kube_action(args: &[String]) {
         }
 
         "conf" => exec_kube_action_conf(&namespace, &app_name, &ymls, &cloud_sdk_container),
-        "secret" => exec_kube_action_secret(&namespace, &app_name, &cloud_sdk_container),
+        "secret" => {
+            let is_x = remains.iter().any(|arg| arg == "-x" || arg == "--secret-x");
+            if is_x {
+                let working_dir = help::get_working_directory();
+                let (file_path, _) = help::get_yml_file_path(&yml_templates, &yml_version, &working_dir, ".secret", 1);
+                let target_file = if file_path.is_empty() {
+                    let fallback = format!("{}/.secret.yml", working_dir);
+                    if std::path::Path::new(&fallback).exists() { fallback } else { format!("{}/.secret.yaml", working_dir) }
+                } else {
+                    file_path
+                };
+
+                match secret_crypto::toggle_encrypt_decrypt_file(&target_file) {
+                    Ok(msg) => util::print(msg),
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                exec_kube_action_secret(&namespace, &app_name, &cloud_sdk_container);
+            }
+        }
         "pods" => {
             pod_actions::cli_kube_action_pods(&namespace, &app_name, &remains[1..], &log_excludes, hide_app_datetime, &cloud_sdk_container)
         }
@@ -265,7 +287,7 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
     command2_items.push(("conf", "show all configurations".to_string()));
 
     if ymls.contains(&"secret".to_string()) {
-        command2_items.push(("secret", "show all decoded secret".to_string()));
+        command2_items.push(("secret", "show all decoded secret, [-x] encrypt/decrypt".to_string()));
     }
 
     if ymls.contains(&"dep".to_string()) {

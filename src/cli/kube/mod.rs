@@ -12,6 +12,7 @@ mod direct;
 mod gate;
 mod help;
 mod pod_actions;
+mod secret_crypto;
 mod var;
 
 pub fn run(args: &[String]) {

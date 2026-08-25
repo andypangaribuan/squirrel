@@ -7,7 +7,7 @@
  * All Rights Reserved.
  */
 
-use super::var;
+use super::{secret_crypto, var};
 use crate::{color, util};
 use std::collections::HashMap;
 
@@ -139,7 +139,7 @@ pub(super) fn get_envs(working_dir: &str) -> HashMap<String, String> {
     if !map.contains_key("KYML_SECRET_DATA")
         && let Some(content) = find_file_in_dir(working_dir, ".secret.yml")
     {
-        map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
+        map.insert("KYML_SECRET_DATA".to_string(), content);
     }
 
     map
@@ -164,7 +164,7 @@ fn get_kyml_os_envs() -> HashMap<String, String> {
     if !map.contains_key("KYML_SECRET_DATA")
         && let Some(content) = find_file_in_dir(&working_dir, ".secret.yml")
     {
-        map.insert("KYML_SECRET_DATA".to_string(), format_kyml_data(&content));
+        map.insert("KYML_SECRET_DATA".to_string(), content);
     }
 
     map
@@ -256,8 +256,21 @@ pub(super) fn replace_with_env(mut lines: String) -> String {
 
     for key in keys {
         if let Some(val) = envs.get(key) {
-            lines = lines.replace(&format!("${}", key), val);
-            lines = lines.replace(key.as_str(), val);
+            let var1 = format!("${}", key);
+            let var2 = format!("${{{}}}", key);
+            if lines.contains(&var1) || lines.contains(&var2) || lines.contains(key.as_str()) {
+                let effective_val = if key == "KYML_SECRET_DATA" && secret_crypto::is_encrypted(val) {
+                    let decrypted = secret_crypto::prompt_and_decrypt(val, ".secret.yml");
+                    format_kyml_data(&decrypted)
+                } else if key == "KYML_SECRET_DATA" {
+                    format_kyml_data(val)
+                } else {
+                    val.clone()
+                };
+
+                lines = lines.replace(&var1, &effective_val);
+                lines = lines.replace(key.as_str(), &effective_val);
+            }
         }
     }
     lines
@@ -266,7 +279,21 @@ pub(super) fn replace_with_env(mut lines: String) -> String {
 pub(super) fn replace_with_kyml_os_envs(mut lines: String) -> String {
     let kyml_envs = get_kyml_os_envs();
     for (key, val) in &kyml_envs {
-        lines = lines.replace(&format!("${}", key), val);
+        let var1 = format!("${}", key);
+        let var2 = format!("${{{}}}", key);
+        if lines.contains(&var1) || lines.contains(&var2) || lines.contains(key.as_str()) {
+            let effective_val = if key == "KYML_SECRET_DATA" && secret_crypto::is_encrypted(val) {
+                let decrypted = secret_crypto::prompt_and_decrypt(val, ".secret.yml");
+                format_kyml_data(&decrypted)
+            } else if key == "KYML_SECRET_DATA" {
+                format_kyml_data(val)
+            } else {
+                val.clone()
+            };
+
+            lines = lines.replace(&var1, &effective_val);
+            lines = lines.replace(key.as_str(), &effective_val);
+        }
     }
     lines
 }

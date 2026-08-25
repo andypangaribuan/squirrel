@@ -7,7 +7,7 @@
  * All Rights Reserved.
  */
 
-use super::{help, var};
+use super::{help, secret_crypto, var};
 use crate::util;
 
 // command: task apply (from "sq kube action")
@@ -65,6 +65,11 @@ fn get_yml_lines(yml_name: &str, yml_templates: &[String], yml_version: &str) ->
                 std::process::exit(1);
             }
         }
+    }
+
+    if secret_crypto::is_encrypted(&lines) {
+        let file_name = std::path::Path::new(&yml_file).file_name().map_or(".secret.yml", |n| n.to_str().unwrap_or(".secret.yml"));
+        lines = secret_crypto::prompt_and_decrypt(&lines, file_name);
     }
 
     let envs = help::get_envs(&working_dir);

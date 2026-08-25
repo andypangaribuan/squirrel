@@ -87,7 +87,7 @@ function bd {
 
 #: move sq into /usr/local/bin/sq
 function move {
-  sudo mv .releases/sq /usr/local/bin/sq
+  sudo cp .releases/sq /usr/local/bin/sq
 }
 
 
