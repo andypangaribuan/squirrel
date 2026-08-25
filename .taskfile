@@ -97,9 +97,9 @@ function bd {
 }
 
 
-#: move sq into /usr/local/bin/sq
-function move {
-  sudo cp .releases/sq /usr/local/bin/sq
+#: copy sq-darwin-arm64 into /usr/local/bin/sq
+function copy {
+  sudo cp .releases/sq-darwin-arm64 /usr/local/bin/sq
 }
 
 
