@@ -30,7 +30,7 @@ debug = "full"
 
 
 [dependencies]
-rmod = { git = "https://github.com/andypangaribuan/rmod", tag = "v1.0.35" }
+# rmod = { git = "https://github.com/andypangaribuan/rmod", tag = "v1.0.35" }
 aes-gcm = "0.10"
 pbkdf2 = "0.12"
 rand = "0.8"

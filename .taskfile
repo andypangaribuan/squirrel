@@ -7,111 +7,116 @@
 
 
 
-#: check the code with cargo check, build, clippy and fmt
-function check {
-  cargo check
-  cargo build
-  cargo clippy && cargo fmt --check
+function main {
+  local options=(
+    "check          check the code with cargo check, build, clippy and fmt"
+    "test           run tests"
+    "spell          run cspell to check the project words"
+    "clean          clean the project"
+    "rmd            remove unused directories"
+    "udeps          show unused dependencies"
+    ""
+    "release        build the release version of sq cli"
+    "release-linux  build the release version of sq cli for linux os"
+    "debug          build the debug version of sq cli"
+    "cp-release     copy the sq release version into local machine"
+    "cp-debug       copy sq debug version into local machine"
+    ""
+    "shell          open devbox shell        [opt]: --fresh (delete .cargo and .rustup directories first)"
+  )
+
+  local selected
+  selected=$(__select_option "$1" "options: " "${options[@]}")
+  [[ -z "$selected" ]] && return 0
+
+  case "$selected" in
+    check) cargo check; cargo build; cargo clippy && cargo fmt --check ;;
+    test)  cargo test -q -- --test-threads=1 ;;
+    spell) spell-rs ;;
+    clean) cargo clean ;;
+    rmd)   rm -rf .cargo .devbox .rustup debug target test-debug ;;
+    udeps) cargo +nightly udeps ;;
+
+    release)
+      mkdir -p .releases
+      rm -rf .releases/sq-darwin-arm64
+      cargo build --release
+      mv target/release/sq .releases/sq-darwin-arm64
+      chmod +x .releases/sq-darwin-arm64
+      rm -rf target
+      ;;
+
+    release-linux)
+      mkdir -p .releases
+      rm -rf .releases/sq-linux-x86_64
+      rustup target add x86_64-unknown-linux-musl
+      cargo install cross --git https://github.com/cross-rs/cross
+      cross build --target x86_64-unknown-linux-musl --release
+      mv target/x86_64-unknown-linux-musl/release/sq .releases/sq-linux-x86_64 
+      chmod +x .releases/sq-linux-x86_64
+      rm -rf target
+      ;;
+
+    debug)      cargo build ;;
+    cp-release) sudo cp .releases/sq-darwin-arm64 /usr/local/bin/sq ;;
+    cp-debug)   sudo cp target/debug/sq /usr/local/bin/sq ;;
+
+    shell) 
+      if [ "$DEVBOX_SHELL_ENABLED" = "1" ]; then
+        echo "ℹ️  You are already in an active Devbox shell."
+        return 0
+      fi
+
+      if [[ $1 == "--fresh" ]]; then
+        rm -rf .cargo .rustup
+      fi
+
+      DEVBOX_PROJECT_CWD="$PWD" devbox shell --config ~/.devbox/global/rust-1.98/devbox.json
+      ;;
+
+    *) echo "unknown option: $selected" ;;
+  esac
 }
 
 
-#: clean the project
-function clean {
-  cargo clean
-}
+function __select_option {
+  local direct="$1"
+  local prompt="$2"
+  shift 2
 
+  local items=("$@")
+  local selected="$direct"
 
-#: do cargo test
-function test {
-  cargo test -q -- --test-threads=1
-}
+  if [[ -z "$selected" ]]; then
+    selected=$(
+      printf "%s\n" "${items[@]}" |
+        awk '
+          $0 == "" {
+            print "__SEP__\t "
+            next
+          }
 
+          {
+            key=$1
+            print key "\t" $0
+          }
+        ' |
+        fzf \
+          --prompt="$prompt" \
+          --no-sort \
+          --layout=reverse \
+          --exact \
+          --delimiter=$'\t' \
+          --with-nth=2.. \
+          --bind='enter:transform:[[ {1} != "__SEP__" ]] && echo accept'
+    )
 
-#: run cspell to check the project words
-function spell {
-  spell-rs
-}
-
-
-#: space
-
-
-#: open devbox shell #: opt: --fresh (delete .cargo and .rustup directories first)
-function shell {
-  if [ "$DEVBOX_SHELL_ENABLED" = "1" ]; then
-    echo "ℹ️  You are already in an active Devbox shell."
-    return 0
+    [[ -z "$selected" ]] && return 0
+    selected="${selected%%$'\t'*}"
   fi
 
-  if [[ $1 == "--fresh" ]]; then
-    rm -rf .cargo .rustup
-  fi
-
-  DEVBOX_PROJECT_CWD="$PWD" devbox shell --config ~/.devbox/global/rust-1.98/devbox.json
+  printf '%s\n' "$selected"
 }
 
 
-#: show unused dependencies
-function udeps {
-  cargo +nightly udeps
-}
-
-
-#: remove unused directories
-function rmd {
-  # rm -rf .cargo .devbox .rustup debug target test-debug
-  echo "hey"
-}
-
-
-#: space
-
-
-#: build the cli app
-function build {
-  mkdir -p .releases
-  rm -rf .releases/sq-darwin-arm64
-  cargo build --release
-  mv target/release/sq .releases/sq-darwin-arm64
-  chmod +x .releases/sq-darwin-arm64
-  rm -rf target
-}
-
-#: build the cli app for linux amd64
-function build64 {
-  mkdir -p .releases
-  rm -rf .releases/sq-linux-x86_64
-  rustup target add x86_64-unknown-linux-musl
-  cargo install cross --git https://github.com/cross-rs/cross
-  cross build --target x86_64-unknown-linux-musl --release
-  mv target/x86_64-unknown-linux-musl/release/sq .releases/sq-linux-x86_64 
-  chmod +x .releases/sq-linux-x86_64
-
-}
-
-
-#: build dev and move
-function bd {
-  cargo build
-  cp target/debug/sq /usr/local/bin/sq
-}
-
-
-#: copy sq-darwin-arm64 into /usr/local/bin/sq
-function copy {
-  sudo cp .releases/sq-darwin-arm64 /usr/local/bin/sq
-}
-
-
-#: use old sq
-function old {
-  # sudo rm -rf /usr/local/bin/sqo && \
-  # sudo curl -L https://github.com/andypangaribuan/squirrel/releases/latest/download/sq-`uname -s`-`uname -m` -o /usr/local/bin/sqo && \
-  # sudo chmod +x /usr/local/bin/sqo
-
-  sudo cp /usr/local/bin/sqo /usr/local/bin/sq
-}
-
-
-#: space
-[ -z "$TASKFILE_EXECUTOR" ] && sq taskfile --execute "$@"
+main "$@"
