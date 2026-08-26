@@ -11,7 +11,7 @@ mod cli;
 mod color;
 mod util;
 
-const VERSION: &str = "2.0.9";
+const VERSION: &str = "2.1.0";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -22,6 +22,7 @@ fn main() {
     }
 
     match args[0].as_str() {
+        "choose" => cli::choose::run(&args[1..]),
         "docker" => cli::docker::run(&args[1..]),
         "kube" => cli::kube::run(&args[1..]),
         "taskfile" => cli::taskfile::run(&args[1..]),
@@ -39,6 +40,7 @@ fn print_help() {
 usage: sq
 
 {commands}
+  choose     interactive selector with fzf
   docker     execute docker cli
   kube       execute kubectl cli
   taskfile   execute taskfile cli

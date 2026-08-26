@@ -7,6 +7,7 @@
  * All Rights Reserved.
  */
 
+pub mod choose;
 pub mod docker;
 pub mod kube;
 pub mod taskfile;

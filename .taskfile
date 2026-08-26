@@ -26,7 +26,7 @@ function main {
   )
 
   local selected
-  selected=$(choose "$1" "options: " "${options[@]}")
+  selected=$(sq choose "$1" "options: " "${options[@]}")
   [[ -z "$selected" ]] && return 0
 
   case "$selected" in
@@ -76,46 +76,6 @@ function main {
 
     *) echo "unknown option: $selected" ;;
   esac
-}
-
-
-function choose {
-  local direct="$1"
-  local prompt="$2"
-  shift 2
-
-  local items=("$@")
-  local selected="$direct"
-
-  if [[ -z "$selected" ]]; then
-    selected=$(
-      printf "%s\n" "${items[@]}" |
-        awk '
-          $0 == "" {
-            print "__SEP__\t "
-            next
-          }
-
-          {
-            key=$1
-            print key "\t" $0
-          }
-        ' |
-        fzf \
-          --prompt="$prompt" \
-          --no-sort \
-          --layout=reverse \
-          --exact \
-          --delimiter=$'\t' \
-          --with-nth=2.. \
-          --bind='enter:transform:[[ {1} != "__SEP__" ]] && echo accept'
-    )
-
-    [[ -z "$selected" ]] && return 0
-    selected="${selected%%$'\t'*}"
-  fi
-
-  printf '%s\n' "$selected"
 }
 
 
