@@ -21,7 +21,7 @@ pub(super) fn exec_kube_action_apply(opt_value: &str, yml_templates: &[String], 
 // command: task yml (from "sq kube action")
 pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String], yml_version: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
-    util::print(lines);
+    util::print(color::colorize_yaml(&lines));
 }
 
 // command: task diff (from "sq kube action")
