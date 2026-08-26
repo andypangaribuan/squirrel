@@ -74,6 +74,9 @@ pub fn exec_stdin(cmd: &str, stdin_data: &str, check: bool, show_output: bool) -
 
         (is_err, String::new())
     } else {
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
+
         let mut child = match command.spawn() {
             Ok(c) => c,
             Err(e) => {

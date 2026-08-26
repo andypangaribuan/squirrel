@@ -32,14 +32,14 @@ pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], y
         return;
     }
 
-    let (_, out) = util::exec_kube_stdin("kubectl diff -f -", &lines, cloud_sdk_container, false, false);
-    let ignore_prefixes = ["diff -u -N /var/folders/", "--- /var/folders/", "+++ /var/folders/", "@@ "];
+    let (is_err, out) = util::exec_kube_stdin("kubectl diff -f -", &lines, cloud_sdk_container, false, false);
+    let ignore_prefixes = ["diff -u -N /", "--- /", "+++ /", "@@ "];
     let filtered_lines: Vec<&str> = out.lines().filter(|line| !ignore_prefixes.iter().any(|prefix| line.starts_with(prefix))).collect();
 
-    if filtered_lines.is_empty() {
-        util::print(color::green(&format!("no changes in {}", opt_value)));
-    } else {
+    if is_err && !filtered_lines.is_empty() {
         util::print(filtered_lines.join("\n"));
+    } else {
+        util::print(color::green(&format!("no changes in {}", opt_value)));
     }
 }
 

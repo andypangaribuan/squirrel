@@ -219,18 +219,38 @@ pub(super) fn cli_kube_action(args: &[String]) {
 
     match remains[0].as_str() {
         "apply" | "yml" | "diff" | "delete" => {
-            if remains.len() < 2 || !ymls.contains(&remains[1]) {
+            let mut targets = Vec::new();
+            for target in &remains[1..] {
+                if target == "*" || target == "all" {
+                    for yml in &ymls {
+                        if !targets.contains(yml) {
+                            targets.push(yml.clone());
+                        }
+                    }
+                } else if ymls.contains(target) {
+                    if !targets.contains(target) {
+                        targets.push(target.clone());
+                    }
+                } else {
+                    eprintln!("{}", more_info);
+                    std::process::exit(1);
+                }
+            }
+
+            if targets.is_empty() {
                 eprintln!("{}", more_info);
                 std::process::exit(1);
             }
 
-            let opt_val = &remains[1];
-            match remains[0].as_str() {
-                "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
-                "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates, &yml_version),
-                "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
-                "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
-                _ => {}
+            let action = remains[0].as_str();
+            for opt_val in &targets {
+                match action {
+                    "apply" => actions::exec_kube_action_apply(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
+                    "yml" => actions::exec_kube_action_yml(opt_val, &yml_templates, &yml_version),
+                    "diff" => actions::exec_kube_action_diff(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
+                    "delete" => actions::exec_kube_action_delete(opt_val, &yml_templates, &yml_version, &cloud_sdk_container),
+                    _ => {}
+                }
             }
         }
 
