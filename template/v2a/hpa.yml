@@ -1,0 +1,46 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: $KYML_APP_NAME
+  minReplicas: $KYML_HPA_MIN_REPLICA
+  maxReplicas: $KYML_HPA_MAX_REPLICA
+  behavior:
+    scaleUp:
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 10
+          periodSeconds: 30
+      selectPolicy: Max
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      policies:
+        - type: Percent
+          value: 75
+          periodSeconds: 30
+        - type: Pods
+          value: 5
+          periodSeconds: 30
+      selectPolicy: Min
+      stabilizationWindowSeconds: 180
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: $KYML_HPA_AVG_CPU
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: $KYML_HPA_AVG_MEMORY
