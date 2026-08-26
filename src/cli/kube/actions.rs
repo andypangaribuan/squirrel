@@ -8,6 +8,7 @@
  */
 
 use super::{help, secret_crypto, var};
+use crate::color;
 use crate::util;
 
 // command: task apply (from "sq kube action")
@@ -26,19 +27,20 @@ pub(super) fn exec_kube_action_yml(opt_value: &str, yml_templates: &[String], ym
 // command: task diff (from "sq kube action")
 pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], yml_version: &str, cloud_sdk_container: &str) {
     let lines = get_yml_lines(opt_value, yml_templates, yml_version);
-
     if opt_value == "secret" {
         help::exec_kube_secret_diff(&lines, cloud_sdk_container);
         return;
     }
 
     let (_, out) = util::exec_kube_stdin("kubectl diff -f -", &lines, cloud_sdk_container, false, false);
-
     let ignore_prefixes = ["diff -u -N /var/folders/", "--- /var/folders/", "+++ /var/folders/", "@@ "];
-
     let filtered_lines: Vec<&str> = out.lines().filter(|line| !ignore_prefixes.iter().any(|prefix| line.starts_with(prefix))).collect();
 
-    util::print(filtered_lines.join("\n"));
+    if filtered_lines.is_empty() {
+        util::print(color::green(&format!("no changes in {}", opt_value)));
+    } else {
+        util::print(filtered_lines.join("\n"));
+    }
 }
 
 // command: task delete (from "sq kube action")
