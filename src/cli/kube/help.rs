@@ -582,7 +582,7 @@ pub(super) fn exec_kube_secret_diff(local_yaml: &str, cloud_sdk_container: &str)
     }
 
     if diff_blocks.is_empty() {
-        util::print("No changes in secret");
+        util::print(color::green("no changes in secret"));
     } else {
         util::print(diff_blocks.join("\n\n"));
     }
