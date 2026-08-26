@@ -12,3 +12,4 @@ pub mod docker;
 pub mod kube;
 pub mod taskfile;
 pub mod tunnel;
+pub mod y_secret;

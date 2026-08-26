@@ -11,7 +11,7 @@ mod cli;
 mod color;
 mod util;
 
-const VERSION: &str = "2.1.4";
+const VERSION: &str = "2.1.5";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -27,6 +27,7 @@ fn main() {
         "kube" => cli::kube::run(&args[1..]),
         "taskfile" => cli::taskfile::run(&args[1..]),
         "tunnel" => cli::tunnel::run(&args[1..]),
+        "y-secret" => cli::y_secret::run(&args[1..]),
         "version" | "--version" | "-v" => println!("{}", VERSION),
         "--help" | "-h" | "help" => print_help(),
         _ => print_help(),
@@ -44,6 +45,7 @@ usage: sq
   docker     execute docker cli
   kube       execute kubectl cli
   taskfile   execute taskfile cli
-  tunnel     manage ssh tunnels"#
+  tunnel     manage ssh tunnels
+  y-secret   scan for unencrypted .secret.yml files"#
     ));
 }
