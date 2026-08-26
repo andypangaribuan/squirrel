@@ -14,12 +14,25 @@ use std::fs;
 use std::path::Path;
 
 pub fn run(args: &[String]) {
-    if args.first().is_some_and(|arg| arg == "--help" || arg == "-h") {
+    let mut is_help = false;
+    let mut is_encrypt = false;
+    let mut root_path_str = ".";
+
+    for arg in args {
+        if arg == "--help" || arg == "-h" {
+            is_help = true;
+        } else if arg == "-x" || arg == "--secret-x" {
+            is_encrypt = true;
+        } else if !arg.starts_with('-') {
+            root_path_str = arg.as_str();
+        }
+    }
+
+    if is_help {
         print_help();
         return;
     }
 
-    let root_path_str = args.first().map(|s| s.as_str()).unwrap_or(".");
     let root_path = Path::new(root_path_str);
 
     if !root_path.exists() {
@@ -30,13 +43,57 @@ pub fn run(args: &[String]) {
     let mut unencrypted_files = Vec::new();
     scan_dir(root_path, &mut unencrypted_files);
 
-    if !unencrypted_files.is_empty() {
-        for file_path in &unencrypted_files {
-            eprintln!("{}", color::bold_red(file_path));
-        }
+    if unencrypted_files.is_empty() {
+        util::print(color::green("all .secret.yml files are encrypted"));
+        return;
+    }
+
+    for file_path in &unencrypted_files {
+        eprintln!("{}", color::bold_red(file_path));
+    }
+
+    if !is_encrypt {
         std::process::exit(1);
-    } else {
-        util::print(color::green("All .secret.yml files are encrypted"));
+    }
+
+    let password = match secret_crypto::read_password("password to encrypt: ") {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{}", color::bold_red(&format!("Error: {}", e)));
+            std::process::exit(1);
+        }
+    };
+
+    if password.is_empty() {
+        eprintln!("{}", color::bold_red("Error: password cannot be empty"));
+        std::process::exit(1);
+    }
+
+    for file_path in &unencrypted_files {
+        let content = match fs::read_to_string(file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("{}", color::bold_red(&format!("Failed to read {}: {}", file_path, e)));
+                continue;
+            }
+        };
+
+        if secret_crypto::is_encrypted(&content) {
+            continue;
+        }
+
+        match secret_crypto::encrypt_text(&content, &password) {
+            Ok(encrypted) => {
+                if let Err(e) = fs::write(file_path, &encrypted) {
+                    eprintln!("{}", color::bold_red(&format!("Failed to write {}: {}", file_path, e)));
+                } else {
+                    util::print(format!("successfully encrypted: {}", file_path));
+                }
+            }
+            Err(e) => {
+                eprintln!("{}", color::bold_red(&format!("Failed to encrypt {}: {}", file_path, e)));
+            }
+        }
     }
 }
 
@@ -73,9 +130,10 @@ fn print_help() {
     util::print(format!(
         r#"
 info : scan for unencrypted .secret.yml files recursively
-usage: sq y-secret [path]
+usage: sq y-secret [options] [path]
 
 {options}
-  [path]      root directory to start scanning from (default: current directory ".")"#
+  -x, --secret-x   encrypt any unencrypted .secret.yml files found
+  [path]           root directory to start scanning from (default: current directory ".")"#
     ));
 }

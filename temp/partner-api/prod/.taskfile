@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Copyright (c) 2025.
+# Created by Andy Pangaribuan. All Rights Reserved.
+# This product is protected by copyright and distributed under
+# licenses restricting copying, distribution and decompilation.
+
+sq kube action \
+  --namespace KYML_NAMESPACE \
+  --app KYML_APP_NAME \
+  --yml sa,secret,dep,pdb,hpa,svc,net,gate \
+  --yml-template sa,secret,dep-http,pdb,hpa,svc-http,net,gate \
+  --yml-version v2a \
+  --log-exclude "defer: 200 OK GET /healthz handler" \
+  --log-exclude "%cron refresh_db: processed, duration%" \
+  --log-exclude "%cron refresh_config_appdata: processed, duration%" \
+  --cloud-sdk-container KYML_CLOUD_SDK_CONTAINER \
+  --cluster-name KYML_CLUSTER_NAME \
+  --kubeconfig-path KYML_KUBECONFIG_PATH \
+  --hide-app-datetime \
+  "$@"
