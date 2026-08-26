@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: $KYML_APP_NAME
+  namespace: $KYML_NAMESPACE
+spec:
+  maxUnavailable: $KYML_PDB_MAX_UNAVAILABLE
+  selector:
+    matchLabels:
+      app: $KYML_APP_NAME
