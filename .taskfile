@@ -26,7 +26,7 @@ function main {
   )
 
   local selected
-  selected=$(__select_option "$1" "options: " "${options[@]}")
+  selected=$(choose "$1" "options: " "${options[@]}")
   [[ -z "$selected" ]] && return 0
 
   case "$selected" in
@@ -79,7 +79,7 @@ function main {
 }
 
 
-function __select_option {
+function choose {
   local direct="$1"
   local prompt="$2"
   shift 2
