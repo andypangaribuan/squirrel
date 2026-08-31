@@ -170,16 +170,6 @@ fn get_kyml_os_envs() -> HashMap<String, String> {
     map
 }
 
-// fn get_sq_cli_os_envs() -> HashMap<String, String> {
-//     let mut map = HashMap::new();
-//     for (k, v) in std::env::vars() {
-//         if k.starts_with("SQ_CLI_") {
-//             map.insert(k, v);
-//         }
-//     }
-//     map
-// }
-
 pub(super) fn get_yml_file_path(
     yml_templates: &[String],
     yml_version: &str,
@@ -197,27 +187,19 @@ pub(super) fn get_yml_file_path(
         }
 
         if !yml_template.is_empty() {
-            // if let Some(template_dir) = get_sq_cli_os_envs().get("SQ_CLI_TEMPLATE_DIR") {
-            //     let path1 = format!("{}/{}.yml", template_dir, yml_template);
-            //     if std::path::Path::new(&path1).exists() {
-            //         return (path1, String::new());
-            //     }
-            //     let path2 = format!("{}/{}.yaml", template_dir, yml_template);
-            //     if std::path::Path::new(&path2).exists() {
-            //         return (path2, String::new());
-            //     }
-            // }
+            let base_urls = [var::GITHUB_TEMPLATE_DIRECTORY, var::GITHUB_TEMPLATE_DIRECTORY_MAIN];
+            for base_url in base_urls {
+                let url = if yml_version.is_empty() {
+                    format!("{}{}.yml", base_url, yml_template)
+                } else {
+                    format!("{}{}/{}.yml", base_url, yml_version, yml_template)
+                };
 
-            let url = if yml_version.is_empty() {
-                format!("{}{}.yml", var::GITHUB_TEMPLATE_DIRECTORY, yml_template)
-            } else {
-                format!("{}{}/{}.yml", var::GITHUB_TEMPLATE_DIRECTORY, yml_version, yml_template)
-            };
-
-            let cmd = format!("curl -s {}", url);
-            let (err, out) = util::exec(&cmd, false, false);
-            if !err && !out.is_empty() && !out.starts_with("404") {
-                return (String::new(), out);
+                let cmd = format!("curl -s {}", url);
+                let (err, out) = util::exec(&cmd, false, false);
+                if !err && !out.is_empty() && !out.starts_with("400") && !out.starts_with("403") && !out.starts_with("404") {
+                    return (String::new(), out);
+                }
             }
         }
 

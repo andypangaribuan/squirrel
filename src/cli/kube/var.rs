@@ -11,6 +11,7 @@ pub(super) const SEARCH_FILE_MAX_LEVEL_ABOVE: usize = 4;
 pub(super) const KEY_KYML_PV_NAME: &str = "KYML_PV_NAME";
 pub(super) const KEY_KYML_PVC_NAME: &str = "KYML_PVC_NAME";
 pub(super) const GITHUB_TEMPLATE_DIRECTORY: &str = "https://raw.githubusercontent.com/andypangaribuan/squirrel/refs/heads/main/template/";
+pub(super) const GITHUB_TEMPLATE_DIRECTORY_MAIN: &str = "https://raw.githubusercontent.com/andypangaribuan/squirrel/main/template/";
 
 pub(super) const COMMAND_ACTION_PODS: &[(&str, &str)] = &[
     ("ls", "show running pods"),
