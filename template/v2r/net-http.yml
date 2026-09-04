@@ -5,6 +5,7 @@ metadata:
   namespace: $KYML_NAMESPACE
 spec:
   default:
+    timeoutSec: 60
     connectionDraining:
       drainingTimeoutSec: 60
   targetRef:
