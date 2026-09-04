@@ -21,6 +21,10 @@ spec:
       annotations: #{$KYML_INCLUDE_BLOCK_ANNOTATIONS,DEFAULT:true,DELETE_BLOCK}
         cluster-autoscaler.kubernetes.io/safe-to-evict: "{$KYML_POD_SAFE_TO_EVICT,DELETE_LINE}"
         linkerd.io/inject: {$KYML_LINKERD_INJECT,DEFAULT:enabled}
+        config.linkerd.io/proxy-inbound-http-server-idle-timeout: "{$KYML_LINKERD_INBOUND_HTTP_SERVER_IDLE_TIMEOUT,DEFAULT:620s}" # Must exceed GCLB's 600s keepalive to stop backend_connection_closed_before_data_sent_to_client (503).
+        config.linkerd.io/proxy-inbound-keepalive: "{$KYML_LINKERD_INBOUND_KEEPALIVE,DEFAULT:30s}" # Sends TCP probes so GCP VPC/NAT doesn't silently sever idle connections from GCLB.
+        config.linkerd.io/proxy-outbound-http-server-idle-timeout: "{$KYML_LINKERD_OUTBOUND_HTTP_SERVER_IDLE_TIMEOUT,DEFAULT:300s}" # Keeps gRPC channels to other internal microservices warm to avoid re-handshake latency.
+        config.linkerd.io/proxy-outbound-keepalive: "{$KYML_LINKERD_OUTBOUND_KEEPALIVE,DEFAULT:30s}" # Prevents PostgreSQL pool and gRPC TCP connections from becoming silent zombie sockets
         config.linkerd.io/proxy-cpu-request: {$KYML_LINKERD_CPU_REQUEST,DEFAULT:100m}
         config.linkerd.io/proxy-cpu-limit: {$KYML_LINKERD_CPU_LIMIT,DEFAULT:1000m}
         config.linkerd.io/proxy-memory-request: {$KYML_LINKERD_MEMORY_REQUEST,DEFAULT:128Mi}
