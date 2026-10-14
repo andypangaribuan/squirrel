@@ -287,6 +287,67 @@ pub fn logs_dir() -> PathBuf {
     tunnel_dir().join("logs")
 }
 
+pub const MAX_LOG_LINES: usize = 10_000;
+pub const TRIM_LOG_LINES: usize = 5_000;
+
+pub fn trim_log_file<P: AsRef<Path>>(path: P, max_lines: usize, keep_lines: usize) -> std::io::Result<bool> {
+    let path = path.as_ref();
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+    let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+
+    let mut reader = BufReader::new(&file);
+    let mut lines: Vec<Vec<u8>> = Vec::new();
+    let mut buf = Vec::new();
+    while reader.read_until(b'\n', &mut buf)? > 0 {
+        lines.push(std::mem::take(&mut buf));
+    }
+
+    if lines.len() <= max_lines {
+        return Ok(false);
+    }
+
+    let start_idx = lines.len().saturating_sub(keep_lines);
+    let trimmed = &lines[start_idx..];
+
+    file.seek(SeekFrom::Start(0))?;
+    let mut writer = std::io::BufWriter::new(file);
+    for line in trimmed {
+        writer.write_all(line)?;
+    }
+    let mut file = writer.into_inner().map_err(|e| e.into_error())?;
+
+    let new_len = file.stream_position()?;
+    file.set_len(new_len)?;
+    file.flush()?;
+
+    Ok(true)
+}
+
+pub fn trim_all_log_files(max_lines: usize, keep_lines: usize) -> std::io::Result<usize> {
+    let dir = logs_dir();
+    if !dir.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path.extension().and_then(|s| s.to_str()) == Some("log")
+                && let Ok(true) = trim_log_file(&path, max_lines, keep_lines)
+            {
+                count += 1;
+            }
+        }
+    }
+    Ok(count)
+}
+
 pub fn current_timestamp() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
@@ -305,6 +366,7 @@ pub fn ensure_dirs_and_templates() -> Result<(), String> {
 
     let ldir = logs_dir();
     fs::create_dir_all(&ldir).map_err(|e| format!("Failed to create logs directory {}: {}", ldir.display(), e))?;
+    let _ = trim_all_log_files(MAX_LOG_LINES, TRIM_LOG_LINES);
 
     let ssh_cfg = ssh_config_path();
     if !ssh_cfg.exists() {
@@ -801,5 +863,35 @@ mod tests {
         let (status_bastion, rec) = get_item_status("db_v2_id_prod_01_bastion", &active);
         assert_eq!(status_bastion, TunnelStatus::Connected, "Bastion item must be connected");
         assert_eq!(rec.unwrap().id, "db_v2_id_prod_01_bastion");
+    }
+
+    #[test]
+    fn test_trim_log_file_when_exceeding_max_lines() {
+        let temp_dir = std::env::temp_dir().join(format!("sq_test_logs_{}", std::process::id()));
+        let _ = fs::create_dir_all(&temp_dir);
+        let log_file = temp_dir.join("test_trim.log");
+
+        // Write 15 lines
+        let mut content = String::new();
+        for i in 1..=15 {
+            content.push_str(&format!("log line {}\n", i));
+        }
+        fs::write(&log_file, &content).unwrap();
+
+        // Max 10 lines, trim to 5
+        let trimmed = trim_log_file(&log_file, 10, 5).unwrap();
+        assert!(trimmed, "File should have been trimmed");
+
+        let after = fs::read_to_string(&log_file).unwrap();
+        let lines: Vec<&str> = after.lines().collect();
+        assert_eq!(lines.len(), 5, "Must have exactly 5 lines remaining");
+        assert_eq!(lines[0], "log line 11", "Oldest lines must be removed, first line should be line 11");
+        assert_eq!(lines[4], "log line 15", "Last line should be line 15");
+
+        // Running trim again should do nothing since 5 <= 10
+        let trimmed_again = trim_log_file(&log_file, 10, 5).unwrap();
+        assert!(!trimmed_again, "File should not be trimmed again");
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

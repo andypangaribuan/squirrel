@@ -8,7 +8,8 @@
  */
 
 use super::config::{
-    ActiveRecord, TunnelStatus, current_timestamp, expand_tilde, is_pid_alive, load_items, logs_dir, modify_active, ssh_config_path,
+    ActiveRecord, MAX_LOG_LINES, TRIM_LOG_LINES, TunnelStatus, current_timestamp, expand_tilde, is_pid_alive, load_items, logs_dir,
+    modify_active, ssh_config_path, trim_log_file,
 };
 
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
@@ -135,6 +136,7 @@ pub fn run_worker(tunnel_target: &str) {
     let worker_pid = std::process::id();
     let safe_name = item.safe_name();
     let log_path = logs_dir().join(format!("{}.log", safe_name));
+    let _ = trim_log_file(&log_path, MAX_LOG_LINES, TRIM_LOG_LINES);
 
     let mut log_file = OpenOptions::new().create(true).append(true).open(&log_path).ok();
 
@@ -374,6 +376,7 @@ pub fn run_worker(tunnel_target: &str) {
         let start_time = Instant::now();
         let mut is_connected = false;
         let mut last_heartbeat = Instant::now();
+        let mut last_trim_check = Instant::now();
 
         loop {
             if !running.load(Ordering::SeqCst) {
@@ -438,6 +441,11 @@ pub fn run_worker(tunnel_target: &str) {
                 }
             }
 
+            if last_trim_check.elapsed() >= Duration::from_secs(60) {
+                last_trim_check = Instant::now();
+                let _ = trim_log_file(&log_path, MAX_LOG_LINES, TRIM_LOG_LINES);
+            }
+
             // Sleep in short 50ms increments to react swiftly to termination signals
             for _ in 0..10 {
                 if !running.load(Ordering::SeqCst) {
@@ -453,6 +461,7 @@ pub fn run_worker(tunnel_target: &str) {
 
         // Child exited, prepare for retry
         retry_count += 1;
+        let _ = trim_log_file(&log_path, MAX_LOG_LINES, TRIM_LOG_LINES);
         if let Some(ref mut f) = log_file {
             let _ = writeln!(f, "[{}] Tunnel disconnected. Waiting 3s before retry...", current_timestamp());
         }
@@ -475,4 +484,5 @@ pub fn run_worker(tunnel_target: &str) {
     if let Some(ref mut f) = log_file {
         let _ = writeln!(f, "[{}] Tunnel '{}' stopped cleanly.\n", current_timestamp(), item.name);
     }
+    let _ = trim_log_file(&log_path, MAX_LOG_LINES, TRIM_LOG_LINES);
 }

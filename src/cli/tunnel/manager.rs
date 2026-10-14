@@ -7,7 +7,10 @@
  * All Rights Reserved.
  */
 
-use super::config::{ActiveRecord, TunnelItem, TunnelStatus, current_timestamp, is_pid_alive, load_active, load_items, modify_active};
+use super::config::{
+    ActiveRecord, MAX_LOG_LINES, TRIM_LOG_LINES, TunnelItem, TunnelStatus, current_timestamp, is_pid_alive, load_active, load_items,
+    modify_active, trim_all_log_files,
+};
 use std::{
     process::{Command, Stdio},
     thread,
@@ -146,6 +149,7 @@ pub fn sync_active_records() {
             }
         }
     });
+    let _ = trim_all_log_files(MAX_LOG_LINES, TRIM_LOG_LINES);
 }
 
 pub fn stop_all_tunnels() -> Result<usize, String> {
