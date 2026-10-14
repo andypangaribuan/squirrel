@@ -528,6 +528,22 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
             .unwrap_or(6)
             .max(6);
 
+        let now = current_timestamp();
+        let max_duration_len = filtered_indices
+            .iter()
+            .map(|&i| {
+                let item = &app.items[i];
+                let (status, maybe_record) = get_item_status(item.item_id(), &app.active_records);
+                if status == TunnelStatus::Connected {
+                    format_duration(maybe_record.as_ref().and_then(|r| r.connected_at), now).len()
+                } else {
+                    1
+                }
+            })
+            .max()
+            .unwrap_or(10)
+            .max(10);
+
         let rows: Vec<Row> = filtered_indices
             .iter()
             .map(|&i| {
@@ -544,7 +560,7 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
                 };
 
                 let duration_str = if status == TunnelStatus::Connected {
-                    format_duration(maybe_record.as_ref().and_then(|r| r.connected_at), current_timestamp())
+                    format_duration(maybe_record.as_ref().and_then(|r| r.connected_at), now)
                 } else {
                     "-".to_string()
                 };
@@ -597,27 +613,36 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
             })
             .collect();
 
+        let avail_w = table_chunk.width.saturating_sub(2);
+        let forward_w = max_forward_len as u16 + 1;
+        let duration_w = max_duration_len as u16 + 1;
+
         let table = if app.is_min {
+            let min_base_w = 2 + (max_name_len as u16 + 1) + forward_w + duration_w + 4;
+            let min_fwd_constraint = if avail_w >= min_base_w { Constraint::Length(forward_w) } else { Constraint::Min(forward_w) };
             Table::new(
                 rows,
                 [
                     Constraint::Length(2),                       // Bullet
                     Constraint::Length(max_name_len as u16 + 1), // Name
-                    Constraint::Min(max_forward_len as u16 + 1), // Forwarding
-                    Constraint::Length(10),                      // Duration
+                    min_fwd_constraint,                          // Forwarding
+                    Constraint::Length(duration_w),              // Duration
                     Constraint::Fill(1),                         // Extra space filler
                 ],
             )
         } else {
+            let base_w =
+                2 + (max_name_len as u16 + 1) + (max_type_len as u16 + 1) + forward_w + (max_target_len as u16 + 1) + duration_w + 7;
+            let fwd_constraint = if avail_w >= base_w { Constraint::Length(forward_w) } else { Constraint::Min(forward_w) };
             Table::new(
                 rows,
                 [
                     Constraint::Length(2),                         // Bullet
                     Constraint::Length(max_name_len as u16 + 1),   // Name
                     Constraint::Length(max_type_len as u16 + 1),   // Type
-                    Constraint::Min(max_forward_len as u16 + 1),   // Forwarding
+                    fwd_constraint,                                // Forwarding
                     Constraint::Length(max_target_len as u16 + 1), // Target
-                    Constraint::Length(10),                        // Duration
+                    Constraint::Length(duration_w),                // Duration
                     Constraint::Fill(1),                           // Description
                 ],
             )
@@ -994,12 +1019,10 @@ mod tests {
                 if line.contains("Name") && line.contains("Forwarding") {
                     header_str = line.clone();
                 }
-                if line.contains("●") && line.contains("127.0.0.1:3210") {
+                if y <= 15 && line.contains("127.0.0.1:3210") {
                     row_str = line;
                 }
             }
-
-            println!("Minimal UI (width {}):\nHeader: {}\nRow: {}", width, header_str, row_str);
 
             // Verify header has only minimal columns (Name, Forwarding, Duration)
             assert!(header_str.contains("Name"));
@@ -1014,5 +1037,111 @@ mod tests {
             assert!(!row_str.contains("->"), "Minimal table row should NOT contain '->'");
             assert!(!row_str.contains("10.181.96.2"), "Minimal table row should NOT contain remote bind in table row");
         }
+    }
+
+    #[test]
+    fn test_forwarding_column_on_large_width() {
+        for width in [150, 180, 220] {
+            let backend = TestBackend::new(width, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(false);
+
+            app.items = vec![crate::cli::tunnel::config::TunnelItem {
+                id: Some("1".to_string()),
+                tunnel_type: "docker-gcloud-tunnel".to_string(),
+                name: "db2 prod clog ch".to_string(),
+                description: "database v2 production".to_string(),
+                host: None,
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 11011,
+                remote_bind: "10.128.0.45".to_string(),
+                remote_port: 5432,
+                project: Some("prj".to_string()),
+                zone: Some("zone".to_string()),
+                instance: Some("gcp-prod-v2".to_string()),
+                service_account_key: None,
+                image: None,
+            }];
+
+            terminal.draw(|f| ui(f, &mut app)).unwrap();
+            let buffer = terminal.backend().buffer();
+            let mut row_str = String::new();
+            for y in 0..buffer.area.height {
+                let mut line = String::new();
+                for x in 0..buffer.area.width {
+                    line.push_str(buffer[(x, y)].symbol());
+                }
+                if line.contains("127.0.0.1:11011") {
+                    row_str = line;
+                    break;
+                }
+            }
+
+            let fwd_pos = row_str.find("10.128.0.45:5432").expect("remote bind not found");
+            let target_pos = row_str.find("gcp-prod-v2").expect("target not found");
+            let fwd_end = fwd_pos + "10.128.0.45:5432".len();
+            let gap = target_pos - fwd_end;
+            assert!(gap <= 4, "Gap between Forwarding and Target is too large ({} spaces) at width {}! Row: {}", gap, width, row_str);
+        }
+    }
+
+    #[test]
+    fn test_duration_to_description_two_spaces() {
+        let backend = TestBackend::new(160, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut app = App::new(false);
+
+        let item = crate::cli::tunnel::config::TunnelItem {
+            id: Some("1".to_string()),
+            tunnel_type: "docker-gcloud-tunnel".to_string(),
+            name: "db2 prod main".to_string(),
+            description: "database v2 production".to_string(),
+            host: None,
+            local_bind: "127.0.0.1".to_string(),
+            local_port: 3210,
+            remote_bind: "10.181.96.2".to_string(),
+            remote_port: 5432,
+            project: Some("prj".to_string()),
+            zone: Some("zone".to_string()),
+            instance: Some("ark".to_string()),
+            service_account_key: None,
+            image: None,
+        };
+        let now = current_timestamp();
+        app.active_records.insert(
+            "1".to_string(),
+            ActiveRecord {
+                id: "1".to_string(),
+                name: "db2 prod main".to_string(),
+                worker_pid: std::process::id(),
+                tunnel_pid: Some(std::process::id()),
+                status: TunnelStatus::Connected,
+                updated_at: now,
+                connected_at: Some(now - 1200), // 20 minutes
+                last_error: None,
+                retry_count: 0,
+            },
+        );
+        app.items = vec![item];
+
+        terminal.draw(|f| ui(f, &mut app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let mut row_str = String::new();
+        for y in 0..buffer.area.height {
+            let mut line = String::new();
+            for x in 0..buffer.area.width {
+                line.push_str(buffer[(x, y)].symbol());
+            }
+            if line.contains("20 minutes") {
+                row_str = line;
+                break;
+            }
+        }
+
+        assert!(
+            row_str.contains("20 minutes  database v2 production"),
+            "Expected 2 spaces between duration and description! Row was:\n{}",
+            row_str
+        );
     }
 }

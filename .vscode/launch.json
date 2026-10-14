@@ -16,7 +16,7 @@
       },
       "preLaunchTask": "cargo build",
       // "args": ["taskfile"]
-      "args": ["tunnel", "-m"]
+      "args": ["tunnel"]
     }
   ]
 }
