@@ -25,7 +25,10 @@ function main {
     "shell          open devbox shell        [opt]: --fresh (delete .cargo and .rustup directories first)"
   )
 
-  local selected=$(sq choose "$1" "options: " "${options[@]}")
+  local selected="$1"
+  if [[ -z "$selected" ]]; then
+    selected=$(sq choose "$1" "options: " "${options[@]}")
+  fi
   [[ -z "$selected" ]] && return 0
 
   case "$selected" in
@@ -42,6 +45,7 @@ function main {
       cargo build --release
       mv target/release/sq .releases/sq-darwin-arm64
       chmod +x .releases/sq-darwin-arm64
+      codesign -s - -f .releases/sq-darwin-arm64
       rm -rf target
       ;;
 
@@ -57,8 +61,16 @@ function main {
       ;;
 
     debug)      cargo build ;;
-    cp-release) sudo cp .releases/sq-darwin-arm64 /usr/local/bin/sq ;;
-    cp-debug)   sudo cp target/debug/sq /usr/local/bin/sq ;;
+    cp-release)
+      sudo rm -f /usr/local/bin/sq
+      sudo cp .releases/sq-darwin-arm64 /usr/local/bin/sq
+      sudo codesign -s - -f /usr/local/bin/sq
+      ;;
+    cp-debug)
+      sudo rm -f /usr/local/bin/sq
+      sudo cp target/debug/sq /usr/local/bin/sq
+      sudo codesign -s - -f /usr/local/bin/sq
+      ;;
 
     shell) 
       if [ "$DEVBOX_SHELL_ENABLED" = "1" ]; then

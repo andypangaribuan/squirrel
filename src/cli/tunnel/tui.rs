@@ -468,7 +468,7 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
             Span::styled(" ", Style::default()),
             Span::styled("Name", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled("Type", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Forwarding (Local -> Remote)", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled("Forwarding", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled("Target", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled("Duration", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled("Description", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
@@ -476,8 +476,8 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
         .height(1)
         .bottom_margin(1);
 
-        let max_name_len = filtered_indices.iter().map(|&i| app.items[i].name.len()).max().unwrap_or(4).max(16);
-        let max_type_len = filtered_indices.iter().map(|&i| app.items[i].tunnel_type.len()).max().unwrap_or(4).max(12);
+        let max_name_len = filtered_indices.iter().map(|&i| app.items[i].name.len()).max().unwrap_or(4).max(4);
+        let max_type_len = filtered_indices.iter().map(|&i| app.items[i].tunnel_type.len()).max().unwrap_or(4).max(4);
         let max_local_len = filtered_indices
             .iter()
             .map(|&i| {
@@ -499,8 +499,8 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
                 format!("{:<max_local_len$} -> {}", local_str, remote_target).len()
             })
             .max()
-            .unwrap_or(28)
-            .max(28); // "Forwarding (Local -> Remote)" header is 28 chars
+            .unwrap_or(10)
+            .max(10);
         let max_target_len = filtered_indices
             .iter()
             .map(|&i| {
@@ -509,7 +509,7 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
             })
             .max()
             .unwrap_or(6)
-            .max(16);
+            .max(6);
 
         let rows: Vec<Row> = filtered_indices
             .iter()
@@ -573,13 +573,13 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
         let table = Table::new(
             rows,
             [
-                Constraint::Length(2),                          // Bullet
-                Constraint::Length(max_name_len as u16 + 2),    // Name
-                Constraint::Length(max_type_len as u16 + 2),    // Type
-                Constraint::Length(max_forward_len as u16 + 2), // Forwarding
-                Constraint::Length(max_target_len as u16 + 2),  // Target
-                Constraint::Length(14),                         // Duration
-                Constraint::Min(20),                            // Description
+                Constraint::Length(2),                         // Bullet
+                Constraint::Length(max_name_len as u16 + 1),   // Name
+                Constraint::Length(max_type_len as u16 + 1),   // Type
+                Constraint::Min(max_forward_len as u16 + 1),   // Forwarding
+                Constraint::Length(max_target_len as u16 + 1), // Target
+                Constraint::Length(10),                        // Duration
+                Constraint::Fill(1),                           // Description
             ],
         )
         .header(header_row)
@@ -869,5 +869,51 @@ mod tests {
         app.clamp_selection();
 
         assert_eq!(app.filtered_indices().len(), app.items.len());
+    }
+
+    #[test]
+    fn test_forwarding_column_on_small_width() {
+        for width in [112, 95, 80] {
+            let backend = TestBackend::new(width, 30);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new();
+
+            app.items = vec![crate::cli::tunnel::config::TunnelItem {
+                id: Some("1".to_string()),
+                tunnel_type: "docker-gcloud-tunnel".to_string(),
+                name: "db2 prod clog ch".to_string(),
+                description: "database v2 production".to_string(),
+                host: None,
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 11011,
+                remote_bind: "10.128.0.45".to_string(),
+                remote_port: 5432,
+                project: Some("prj".to_string()),
+                zone: Some("zone".to_string()),
+                instance: Some("gcp-prod-v2".to_string()),
+                service_account_key: None,
+                image: None,
+            }];
+
+            terminal.draw(|f| ui(f, &mut app)).unwrap();
+            let buffer = terminal.backend().buffer();
+            let mut row_str = String::new();
+            for y in 0..buffer.area.height {
+                let mut line = String::new();
+                for x in 0..buffer.area.width {
+                    line.push_str(buffer[(x, y)].symbol());
+                }
+                if line.contains("127.0.0.1:11011") {
+                    row_str = line;
+                    break;
+                }
+            }
+            assert!(
+                row_str.contains("127.0.0.1:11011 -> 10.128.0.45:5432"),
+                "Forwarding was truncated at width {}! Row was: {}",
+                width,
+                row_str
+            );
+        }
     }
 }
