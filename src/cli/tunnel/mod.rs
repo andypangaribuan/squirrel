@@ -19,13 +19,18 @@ pub fn run(args: &[String]) {
     let _ = config::ensure_dirs_and_templates();
 
     if args.is_empty() {
-        if let Err(e) = tui::run() {
+        if let Err(e) = tui::run(false) {
             eprintln!("{}", color::bold_red(&format!("Error running TUI: {}", e)));
         }
         return;
     }
 
     match args[0].as_str() {
+        "--min" | "-m" => {
+            if let Err(e) = tui::run(true) {
+                eprintln!("{}", color::bold_red(&format!("Error running TUI: {}", e)));
+            }
+        }
         "--help" | "-h" | "help" => print_help(),
         "_watch" => {
             if args.len() > 1 {
@@ -59,16 +64,20 @@ pub fn run(args: &[String]) {
 
 fn print_help() {
     let commands = color::bold_green("commands:");
+    let options = color::bold_green("options:");
     util::print(format!(
         r#"
 info : manage ssh and gcloud tunnels
-usage: sq tunnel [command]
+usage: sq tunnel [command] [options]
 
 {commands}
   (empty)   open interactive TUI tunnel manager
   list, ls  list configured tunnels and current status
   start     start a tunnel by name
   stop      stop a tunnel by name
+
+{options}
+  --min, -m open minimal interactive TUI tunnel manager
 "#
     ));
 }

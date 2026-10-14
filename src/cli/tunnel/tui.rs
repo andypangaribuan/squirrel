@@ -49,10 +49,11 @@ pub struct App {
     error_message: Option<String>,
     search_query: String,
     search_active: bool,
+    pub is_min: bool,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(is_min: bool) -> Self {
         let mut app = Self {
             items: Vec::new(),
             active_records: BTreeMap::new(),
@@ -62,6 +63,7 @@ impl App {
             error_message: None,
             search_query: String::new(),
             search_active: false,
+            is_min,
         };
         app.reload_items();
         app.refresh_active();
@@ -196,14 +198,14 @@ impl App {
     }
 }
 
-pub fn run() -> Result<(), String> {
+pub fn run(is_min: bool) -> Result<(), String> {
     enable_raw_mode().map_err(|e| format!("Failed to enable raw mode: {}", e))?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).map_err(|e| format!("Failed to enter alternate screen: {}", e))?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).map_err(|e| format!("Failed to initialize terminal: {}", e))?;
 
-    let res = run_app(&mut terminal);
+    let res = run_app(&mut terminal, is_min);
 
     let _ = disable_raw_mode();
     let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
@@ -212,8 +214,8 @@ pub fn run() -> Result<(), String> {
     res
 }
 
-fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(), String> {
-    let mut app = App::new();
+fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, is_min: bool) -> Result<(), String> {
+    let mut app = App::new(is_min);
 
     loop {
         terminal.draw(|f| ui(f, &mut app)).map_err(|e| format!("Failed to draw UI: {}", e))?;
@@ -464,17 +466,28 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
     } else {
         let selected_style = Style::default().bg(Color::Rgb(35, 45, 65)).add_modifier(Modifier::BOLD);
 
-        let header_row = Row::new(vec![
-            Span::styled(" ", Style::default()),
-            Span::styled("Name", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Type", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Forwarding", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Target", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Duration", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("Description", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        ])
-        .height(1)
-        .bottom_margin(1);
+        let header_row = if app.is_min {
+            Row::new(vec![
+                Span::styled(" ", Style::default()),
+                Span::styled("Name", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Forwarding", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Duration", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ])
+            .height(1)
+            .bottom_margin(1)
+        } else {
+            Row::new(vec![
+                Span::styled(" ", Style::default()),
+                Span::styled("Name", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Type", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Forwarding", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Target", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Duration", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::styled("Description", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ])
+            .height(1)
+            .bottom_margin(1)
+        };
 
         let max_name_len = filtered_indices.iter().map(|&i| app.items[i].name.len()).max().unwrap_or(4).max(4);
         let max_type_len = filtered_indices.iter().map(|&i| app.items[i].tunnel_type.len()).max().unwrap_or(4).max(4);
@@ -486,21 +499,25 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
             })
             .max()
             .unwrap_or(0);
-        let max_forward_len = filtered_indices
-            .iter()
-            .map(|&i| {
-                let item = &app.items[i];
-                let local_str = format!("{}:{}", item.local_bind, item.local_port);
-                let remote_target = if item.is_cloud_sql_proxy() {
-                    format!(":{}", item.remote_port())
-                } else {
-                    format!("{}:{}", item.remote_bind, item.remote_port())
-                };
-                format!("{:<max_local_len$} -> {}", local_str, remote_target).len()
-            })
-            .max()
-            .unwrap_or(10)
-            .max(10);
+        let max_forward_len = if app.is_min {
+            max_local_len.max(10)
+        } else {
+            filtered_indices
+                .iter()
+                .map(|&i| {
+                    let item = &app.items[i];
+                    let local_str = format!("{}:{}", item.local_bind, item.local_port);
+                    let remote_target = if item.is_cloud_sql_proxy() {
+                        format!(":{}", item.remote_port())
+                    } else {
+                        format!("{}:{}", item.remote_bind, item.remote_port())
+                    };
+                    format!("{:<max_local_len$} -> {}", local_str, remote_target).len()
+                })
+                .max()
+                .unwrap_or(10)
+                .max(10)
+        };
         let max_target_len = filtered_indices
             .iter()
             .map(|&i| {
@@ -526,30 +543,6 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
                     TunnelStatus::Disconnected => ("●", Color::Red),
                 };
 
-                let type_span = if item.is_cloud_sql_proxy() {
-                    Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::Magenta))
-                } else if item.is_gcloud() {
-                    Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::LightGreen))
-                } else {
-                    Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::Cyan))
-                };
-
-                let local_str = format!("{}:{}", item.local_bind, item.local_port);
-                let remote_target = if item.is_cloud_sql_proxy() {
-                    format!(":{}", item.remote_port())
-                } else {
-                    format!("{}:{}", item.remote_bind, item.remote_port())
-                };
-                let forward_str = format!("{:<max_local_len$} -> {}", local_str, remote_target);
-
-                let target_str = if let Some(ref h) = item.host {
-                    h.clone()
-                } else if let Some(ref inst) = item.instance {
-                    inst.clone()
-                } else {
-                    "-".to_string()
-                };
-
                 let duration_str = if status == TunnelStatus::Connected {
                     format_duration(maybe_record.as_ref().and_then(|r| r.connected_at), current_timestamp())
                 } else {
@@ -558,30 +551,77 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
                 let duration_style =
                     if duration_str == "-" { Style::default().fg(Color::DarkGray) } else { Style::default().fg(Color::White) };
 
-                Row::new(vec![
-                    Span::styled(bullet_char, Style::default().fg(bullet_color)),
-                    Span::styled(item.name.clone(), Style::default()),
-                    type_span,
-                    Span::styled(forward_str, Style::default().fg(Color::White)),
-                    Span::styled(target_str, Style::default().fg(Color::DarkGray)),
-                    Span::styled(duration_str, duration_style),
-                    Span::styled(item.description.clone(), Style::default().fg(Color::Gray)),
-                ])
+                if app.is_min {
+                    let forward_str = format!("{}:{}", item.local_bind, item.local_port);
+                    Row::new(vec![
+                        Span::styled(bullet_char, Style::default().fg(bullet_color)),
+                        Span::styled(item.name.clone(), Style::default()),
+                        Span::styled(forward_str, Style::default().fg(Color::White)),
+                        Span::styled(duration_str, duration_style),
+                    ])
+                } else {
+                    let type_span = if item.is_cloud_sql_proxy() {
+                        Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::Magenta))
+                    } else if item.is_gcloud() {
+                        Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::LightGreen))
+                    } else {
+                        Span::styled(item.tunnel_type.clone(), Style::default().fg(Color::Cyan))
+                    };
+
+                    let local_str = format!("{}:{}", item.local_bind, item.local_port);
+                    let remote_target = if item.is_cloud_sql_proxy() {
+                        format!(":{}", item.remote_port())
+                    } else {
+                        format!("{}:{}", item.remote_bind, item.remote_port())
+                    };
+                    let forward_str = format!("{:<max_local_len$} -> {}", local_str, remote_target);
+
+                    let target_str = if let Some(ref h) = item.host {
+                        h.clone()
+                    } else if let Some(ref inst) = item.instance {
+                        inst.clone()
+                    } else {
+                        "-".to_string()
+                    };
+
+                    Row::new(vec![
+                        Span::styled(bullet_char, Style::default().fg(bullet_color)),
+                        Span::styled(item.name.clone(), Style::default()),
+                        type_span,
+                        Span::styled(forward_str, Style::default().fg(Color::White)),
+                        Span::styled(target_str, Style::default().fg(Color::DarkGray)),
+                        Span::styled(duration_str, duration_style),
+                        Span::styled(item.description.clone(), Style::default().fg(Color::Gray)),
+                    ])
+                }
             })
             .collect();
 
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Length(2),                         // Bullet
-                Constraint::Length(max_name_len as u16 + 1),   // Name
-                Constraint::Length(max_type_len as u16 + 1),   // Type
-                Constraint::Min(max_forward_len as u16 + 1),   // Forwarding
-                Constraint::Length(max_target_len as u16 + 1), // Target
-                Constraint::Length(10),                        // Duration
-                Constraint::Fill(1),                           // Description
-            ],
-        )
+        let table = if app.is_min {
+            Table::new(
+                rows,
+                [
+                    Constraint::Length(2),                       // Bullet
+                    Constraint::Length(max_name_len as u16 + 1), // Name
+                    Constraint::Min(max_forward_len as u16 + 1), // Forwarding
+                    Constraint::Length(10),                      // Duration
+                    Constraint::Fill(1),                         // Extra space filler
+                ],
+            )
+        } else {
+            Table::new(
+                rows,
+                [
+                    Constraint::Length(2),                         // Bullet
+                    Constraint::Length(max_name_len as u16 + 1),   // Name
+                    Constraint::Length(max_type_len as u16 + 1),   // Type
+                    Constraint::Min(max_forward_len as u16 + 1),   // Forwarding
+                    Constraint::Length(max_target_len as u16 + 1), // Target
+                    Constraint::Length(10),                        // Duration
+                    Constraint::Fill(1),                           // Description
+                ],
+            )
+        }
         .header(header_row)
         .block(table_block)
         .row_highlight_style(selected_style)
@@ -802,7 +842,7 @@ mod tests {
     fn test_ui_renders_correctly() {
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut app = App::new();
+        let mut app = App::new(false);
 
         terminal.draw(|f| ui(f, &mut app)).unwrap();
         let buffer = terminal.backend().buffer();
@@ -829,7 +869,7 @@ mod tests {
     fn test_modal_rendering() {
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut app = App::new();
+        let mut app = App::new(false);
 
         app.open_modal();
         assert!(app.modal.is_some());
@@ -846,7 +886,7 @@ mod tests {
     fn test_search_mode_and_filtering() {
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut app = App::new();
+        let mut app = App::new(false);
 
         // Enable search mode
         app.search_active = true;
@@ -876,7 +916,7 @@ mod tests {
         for width in [112, 95, 80] {
             let backend = TestBackend::new(width, 30);
             let mut terminal = Terminal::new(backend).unwrap();
-            let mut app = App::new();
+            let mut app = App::new(false);
 
             app.items = vec![crate::cli::tunnel::config::TunnelItem {
                 id: Some("1".to_string()),
@@ -914,6 +954,65 @@ mod tests {
                 width,
                 row_str
             );
+        }
+    }
+
+    #[test]
+    fn test_minimal_ui_mode() {
+        for width in [60, 50, 45] {
+            let backend = TestBackend::new(width, 25);
+            let mut terminal = Terminal::new(backend).unwrap();
+            let mut app = App::new(true);
+
+            app.items = vec![crate::cli::tunnel::config::TunnelItem {
+                id: Some("1".to_string()),
+                tunnel_type: "docker-gcloud-tunnel".to_string(),
+                name: "db2 prod main".to_string(),
+                description: "database v2 production".to_string(),
+                host: None,
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 3210,
+                remote_bind: "10.181.96.2".to_string(),
+                remote_port: 5432,
+                project: Some("prj".to_string()),
+                zone: Some("zone".to_string()),
+                instance: Some("ark".to_string()),
+                service_account_key: None,
+                image: None,
+            }];
+
+            terminal.draw(|f| ui(f, &mut app)).unwrap();
+            let buffer = terminal.backend().buffer();
+
+            let mut header_str = String::new();
+            let mut row_str = String::new();
+            for y in 0..buffer.area.height {
+                let mut line = String::new();
+                for x in 0..buffer.area.width {
+                    line.push_str(buffer[(x, y)].symbol());
+                }
+                if line.contains("Name") && line.contains("Forwarding") {
+                    header_str = line.clone();
+                }
+                if line.contains("●") && line.contains("127.0.0.1:3210") {
+                    row_str = line;
+                }
+            }
+
+            println!("Minimal UI (width {}):\nHeader: {}\nRow: {}", width, header_str, row_str);
+
+            // Verify header has only minimal columns (Name, Forwarding, Duration)
+            assert!(header_str.contains("Name"));
+            assert!(header_str.contains("Forwarding"));
+            assert!(header_str.contains("Duration"));
+            assert!(!header_str.contains("Type"), "Header should not contain Type in minimal mode");
+            assert!(!header_str.contains("Target"), "Header should not contain Target in minimal mode");
+            assert!(!header_str.contains("Description"), "Header should not contain Description in minimal mode");
+
+            // Verify row shows local forwarding only (127.0.0.1:3210) without remote
+            assert!(row_str.contains("127.0.0.1:3210"), "Minimal row should contain local forwarding at width {}", width);
+            assert!(!row_str.contains("->"), "Minimal table row should NOT contain '->'");
+            assert!(!row_str.contains("10.181.96.2"), "Minimal table row should NOT contain remote bind in table row");
         }
     }
 }

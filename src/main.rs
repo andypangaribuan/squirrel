@@ -11,7 +11,7 @@ mod cli;
 mod color;
 mod util;
 
-const VERSION: &str = "2.1.7";
+const VERSION: &str = "2.1.8";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
