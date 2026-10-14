@@ -171,8 +171,8 @@ fn exec_start(id_or_name: &str) {
         }
     };
 
-    let item = match items.into_iter().find(|i| i.item_id() == id_or_name || i.name == id_or_name) {
-        Some(it) => it,
+    let item = match items.iter().find(|i| i.item_id() == id_or_name).or_else(|| items.iter().find(|i| i.name == id_or_name)) {
+        Some(it) => it.clone(),
         None => {
             eprintln!("{}", color::bold_red(&format!("Tunnel '{}' not found in items.json", id_or_name)));
             return;

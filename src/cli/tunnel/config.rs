@@ -538,7 +538,10 @@ pub fn save_active(records: &BTreeMap<String, ActiveRecord>) -> Result<(), Strin
 }
 
 pub fn get_item_status(id_or_name: &str, active: &BTreeMap<String, ActiveRecord>) -> (TunnelStatus, Option<ActiveRecord>) {
-    let rec = active.get(id_or_name).or_else(|| active.values().find(|r| r.id == id_or_name || r.name == id_or_name));
+    let rec = active
+        .get(id_or_name)
+        .or_else(|| active.values().find(|r| r.id == id_or_name))
+        .or_else(|| active.values().find(|r| r.name == id_or_name));
     if let Some(record) = rec {
         if is_pid_alive(record.worker_pid) { (record.status, Some(record.clone())) } else { (TunnelStatus::Inactive, None) }
     } else {
@@ -770,5 +773,33 @@ mod tests {
         let item = &items[0];
         assert_eq!(item.remote_port(), 5433);
         assert_eq!(item.docker_image(), "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.25.0");
+    }
+
+    #[test]
+    fn test_get_item_status_with_duplicate_name() {
+        let mut active = BTreeMap::new();
+        active.insert(
+            "db_v2_id_prod_01_bastion".to_string(),
+            ActiveRecord {
+                id: "db_v2_id_prod_01_bastion".to_string(),
+                name: "db2 prod main".to_string(),
+                worker_pid: std::process::id(),
+                tunnel_pid: None,
+                status: TunnelStatus::Connected,
+                updated_at: 1000,
+                connected_at: Some(1000),
+                last_error: None,
+                retry_count: 0,
+            },
+        );
+
+        // Querying the inactive item that has the same name
+        let (status_direct, _) = get_item_status("db_v2_id_prod_01", &active);
+        assert_eq!(status_direct, TunnelStatus::Inactive, "Item db_v2_id_prod_01 must be inactive");
+
+        // Querying the active bastion item
+        let (status_bastion, rec) = get_item_status("db_v2_id_prod_01_bastion", &active);
+        assert_eq!(status_bastion, TunnelStatus::Connected, "Bastion item must be connected");
+        assert_eq!(rec.unwrap().id, "db_v2_id_prod_01_bastion");
     }
 }

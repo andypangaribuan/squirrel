@@ -104,8 +104,8 @@ pub fn run_worker(tunnel_target: &str) {
         }
     };
 
-    let item = match items.into_iter().find(|i| i.item_id() == tunnel_target || i.name == tunnel_target) {
-        Some(it) => it,
+    let item = match items.iter().find(|i| i.item_id() == tunnel_target).or_else(|| items.iter().find(|i| i.name == tunnel_target)) {
+        Some(it) => it.clone(),
         None => {
             eprintln!("Tunnel item '{}' not found", tunnel_target);
             return;

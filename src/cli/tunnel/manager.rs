@@ -19,7 +19,11 @@ pub fn start_tunnel(item: &TunnelItem) -> Result<(), String> {
 
     // Check if already running
     let active = load_active().unwrap_or_default();
-    if let Some(record) = active.get(item_id).or_else(|| active.values().find(|r| r.name == item.name))
+    let running_record = active
+        .get(item_id)
+        .or_else(|| active.values().find(|r| r.id == item_id))
+        .or_else(|| if item.id.is_none() { active.values().find(|r| r.name == item.name) } else { None });
+    if let Some(record) = running_record
         && is_pid_alive(record.worker_pid)
     {
         return Ok(());
@@ -63,7 +67,10 @@ pub fn stop_tunnel(tunnel_id_or_name: &str) -> Result<(), String> {
         let target_key = if active.contains_key(tunnel_id_or_name) {
             Some(tunnel_id_or_name.to_string())
         } else {
-            active.iter().find_map(|(k, v)| if v.id == tunnel_id_or_name || v.name == tunnel_id_or_name { Some(k.clone()) } else { None })
+            active
+                .iter()
+                .find_map(|(k, v)| if v.id == tunnel_id_or_name { Some(k.clone()) } else { None })
+                .or_else(|| active.iter().find_map(|(k, v)| if v.name == tunnel_id_or_name { Some(k.clone()) } else { None }))
         };
 
         target_key.and_then(|k| active.remove(&k))
@@ -162,7 +169,13 @@ pub fn restart_all_tunnels() -> Result<usize, String> {
     let all_items = load_items()?;
     let mut to_restart = Vec::new();
     for (key, record) in &active {
-        if let Some(item) = all_items.iter().find(|i| i.item_id() == key || i.item_id() == record.id || i.name == record.name) {
+        let item = all_items
+            .iter()
+            .find(|i| i.item_id() == key || i.item_id() == record.id)
+            .or_else(|| all_items.iter().find(|i| i.name == record.name));
+        if let Some(item) = item
+            && !to_restart.iter().any(|existing: &TunnelItem| existing.item_id() == item.item_id())
+        {
             to_restart.push(item.clone());
         }
     }
@@ -184,4 +197,69 @@ pub fn restart_all_tunnels() -> Result<usize, String> {
         }
     }
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_restart_matching_prioritizes_id_over_name() {
+        let items = vec![
+            TunnelItem {
+                id: Some("db_v2_id_prod_01".to_string()),
+                tunnel_type: "ssh-tunnel".to_string(),
+                name: "db2 prod main".to_string(),
+                description: "ssh direct".to_string(),
+                host: Some("gcp-prod-v2".to_string()),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 3210,
+                remote_bind: "andb-main".to_string(),
+                remote_port: 5432,
+                project: None,
+                zone: None,
+                instance: None,
+                service_account_key: None,
+                image: None,
+            },
+            TunnelItem {
+                id: Some("db_v2_id_prod_01_bastion".to_string()),
+                tunnel_type: "docker-gcloud-tunnel".to_string(),
+                name: "db2 prod main".to_string(),
+                description: "bastion".to_string(),
+                host: None,
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 3210,
+                remote_bind: "10.181.96.2".to_string(),
+                remote_port: 5432,
+                project: Some("prj".to_string()),
+                zone: Some("zone".to_string()),
+                instance: Some("ark".to_string()),
+                service_account_key: None,
+                image: None,
+            },
+        ];
+
+        let key = "db_v2_id_prod_01_bastion";
+        let record = ActiveRecord {
+            id: "db_v2_id_prod_01_bastion".to_string(),
+            name: "db2 prod main".to_string(),
+            worker_pid: 9999,
+            tunnel_pid: None,
+            status: TunnelStatus::Connected,
+            updated_at: 1000,
+            connected_at: Some(1000),
+            last_error: None,
+            retry_count: 0,
+        };
+
+        let matched_item = items
+            .iter()
+            .find(|i| i.item_id() == key || i.item_id() == record.id)
+            .or_else(|| items.iter().find(|i| i.name == record.name))
+            .expect("should match");
+
+        assert_eq!(matched_item.item_id(), "db_v2_id_prod_01_bastion", "Must match bastion item by ID, not first item with same name");
+        assert_eq!(matched_item.tunnel_type, "docker-gcloud-tunnel");
+    }
 }
