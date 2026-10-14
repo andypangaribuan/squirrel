@@ -45,7 +45,7 @@ usage: sq
   docker     execute docker cli
   kube       execute kubectl cli
   taskfile   execute taskfile cli
-  tunnel     manage ssh tunnels
+  tunnel     manage ssh and gcloud tunnels
   y-secret   scan for unencrypted .secret.yml files"#
     ));
 }

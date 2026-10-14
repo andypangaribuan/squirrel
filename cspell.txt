@@ -7,3 +7,4 @@ ymls
 statefulset
 keepalive
 GCLB
+cloudflared
