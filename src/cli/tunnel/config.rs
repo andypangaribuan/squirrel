@@ -113,6 +113,12 @@ pub struct TunnelItem {
     #[serde(default)]
     pub instance: Option<String>,
 
+    #[serde(default, alias = "username", alias = "ssh_user", alias = "ssh-user")]
+    pub user: Option<String>,
+
+    #[serde(default, rename = "ssh-key", alias = "ssh_key", alias = "identity-file", alias = "identity_file", alias = "identity")]
+    pub ssh_key: Option<String>,
+
     #[serde(
         default,
         rename = "service-account-key",
@@ -209,6 +215,7 @@ impl TunnelItem {
             || self.tunnel_type.to_lowercase().contains(&q)
             || self.host.as_deref().unwrap_or("").to_lowercase().contains(&q)
             || self.instance.as_deref().unwrap_or("").to_lowercase().contains(&q)
+            || self.user.as_deref().unwrap_or("").to_lowercase().contains(&q)
             || self.project.as_deref().unwrap_or("").to_lowercase().contains(&q)
             || self.local_bind.to_lowercase().contains(&q)
             || self.remote_bind.to_lowercase().contains(&q)
@@ -893,5 +900,30 @@ mod tests {
         assert!(!trimmed_again, "File should not be trimmed again");
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_parse_gcloud_tunnel_with_user_and_ssh_key() {
+        let json = r#"{
+            "id": "gcp_bastion_tunnel",
+            "type": "docker-gcloud-tunnel",
+            "name": "bastion custom user",
+            "project": "my-proj",
+            "zone": "asia-southeast1-a",
+            "instance": "bastion-vm",
+            "user": "apangaribuan",
+            "ssh-key": "~/.ssh/google_compute_engine",
+            "service-account-key": "~/.ssh/sa.json",
+            "local-port": 5002,
+            "remote-bind": "10.0.0.5",
+            "remote-port": 5432
+        }"#;
+
+        let item: TunnelItem = serde_json::from_str(json).expect("Failed to parse tunnel item");
+        assert_eq!(item.user.as_deref(), Some("apangaribuan"));
+        assert_eq!(item.ssh_key.as_deref(), Some("~/.ssh/google_compute_engine"));
+        assert_eq!(item.service_account_key.as_deref(), Some("~/.ssh/sa.json"));
+        assert!(item.matches_query("apangaribuan"));
+        assert!(item.matches_query("bastion-vm"));
     }
 }

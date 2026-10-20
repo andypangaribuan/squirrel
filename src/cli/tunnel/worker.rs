@@ -18,6 +18,7 @@ use std::{
     fs::OpenOptions,
     io::Write,
     net::{TcpStream, ToSocketAddrs},
+    path::PathBuf,
     process::{Command, Stdio},
     sync::{
         Arc,
@@ -223,28 +224,73 @@ pub fn run_worker(tunnel_target: &str) {
             c.arg("run").arg("--rm").arg("--name").arg(&docker_container_name);
             c.arg("-e").arg("CLOUDSDK_CORE_DISABLE_PROMPTS=1");
 
-            // Persist / mount SSH keys in container to avoid regenerating keys every run
-            let ssh_dir = expand_tilde("~/.squirrel/tunnel/.ssh");
-            let _ = std::fs::create_dir_all(&ssh_dir);
+            let mut internal_ssh_key = None;
 
-            // If user has local ~/.ssh/google_compute_engine, seed it into ~/.squirrel/tunnel/.ssh if not present
-            let host_gce_priv = expand_tilde("~/.ssh/google_compute_engine");
-            let host_gce_pub = expand_tilde("~/.ssh/google_compute_engine.pub");
-            let target_priv = ssh_dir.join("google_compute_engine");
-            let target_pub = ssh_dir.join("google_compute_engine.pub");
-            if host_gce_priv.exists() && !target_priv.exists() {
-                let _ = std::fs::copy(&host_gce_priv, &target_priv);
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    let _ = std::fs::set_permissions(&target_priv, std::fs::Permissions::from_mode(0o600));
+            if let Some(ref k) = item.ssh_key {
+                let p = expand_tilde(k);
+                if p.exists() {
+                    // Directly mount host key into container as read-only
+                    c.arg("-v").arg(format!("{}:/root/.ssh/id_custom:ro", p.display()));
+                    let pub_p = PathBuf::from(format!("{}.pub", p.display()));
+                    if pub_p.exists() {
+                        c.arg("-v").arg(format!("{}:/root/.ssh/id_custom.pub:ro", pub_p.display()));
+                    }
+                    internal_ssh_key = Some("/root/.ssh/id_custom".to_string());
                 }
-            }
-            if host_gce_pub.exists() && !target_pub.exists() {
-                let _ = std::fs::copy(&host_gce_pub, &target_pub);
-            }
+            } else {
+                // Fallback: persist / mount SSH keys in container to avoid regenerating keys every run
+                let ssh_dir = expand_tilde("~/.squirrel/tunnel/.ssh");
+                let _ = std::fs::create_dir_all(&ssh_dir);
 
-            c.arg("-v").arg(format!("{}:/root/.ssh", ssh_dir.display()));
+                // If user has local ~/.ssh/google_compute_engine, seed it into ~/.squirrel/tunnel/.ssh if not present
+                let host_gce_priv = expand_tilde("~/.ssh/google_compute_engine");
+                let host_gce_pub = expand_tilde("~/.ssh/google_compute_engine.pub");
+                let target_priv = ssh_dir.join("google_compute_engine");
+                let target_pub = ssh_dir.join("google_compute_engine.pub");
+                if host_gce_priv.exists() && !target_priv.exists() {
+                    let _ = std::fs::copy(&host_gce_priv, &target_priv);
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let _ = std::fs::set_permissions(&target_priv, std::fs::Permissions::from_mode(0o600));
+                    }
+                }
+                if host_gce_pub.exists() && !target_pub.exists() {
+                    let _ = std::fs::copy(&host_gce_pub, &target_pub);
+                }
+
+                if target_priv.exists() || host_gce_priv.exists() {
+                    internal_ssh_key = Some("/root/.ssh/google_compute_engine".to_string());
+                } else {
+                    let host_ed25519 = expand_tilde("~/.ssh/id_ed25519");
+                    let host_rsa = expand_tilde("~/.ssh/id_rsa");
+                    if host_ed25519.exists() {
+                        let target = ssh_dir.join("id_ed25519");
+                        if host_ed25519 != target {
+                            let _ = std::fs::copy(&host_ed25519, &target);
+                        }
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600));
+                        }
+                        internal_ssh_key = Some("/root/.ssh/id_ed25519".to_string());
+                    } else if host_rsa.exists() {
+                        let target = ssh_dir.join("id_rsa");
+                        if host_rsa != target {
+                            let _ = std::fs::copy(&host_rsa, &target);
+                        }
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600));
+                        }
+                        internal_ssh_key = Some("/root/.ssh/id_rsa".to_string());
+                    }
+                }
+
+                c.arg("-v").arg(format!("{}:/root/.ssh", ssh_dir.display()));
+            }
 
             // Mount SA key if specified
             let mut internal_sa_path = String::new();
@@ -275,20 +321,54 @@ pub fn run_worker(tunnel_target: &str) {
                 sh_cmd.push_str(&format!("gcloud config set project {} --quiet", proj));
             }
 
-            let instance = item.instance.as_deref().unwrap_or("");
+            let raw_instance = item.instance.as_deref().unwrap_or("");
+            let (target_user, instance_name) = if let Some(ref u) = item.user {
+                let trimmed = u.trim();
+                if trimmed.is_empty() { (None, raw_instance) } else { (Some(trimmed), raw_instance) }
+            } else if let Some((u, inst)) = raw_instance.split_once('@') {
+                (Some(u), inst)
+            } else {
+                (None, raw_instance)
+            };
+
+            let instance = instance_name;
             let zone_flag = item.zone.as_ref().map(|z| format!(" --zone={}", z)).unwrap_or_default();
 
             let is_remote_different = !item.remote_bind.is_empty() && item.remote_bind != "127.0.0.1" && item.remote_bind != "localhost";
+            let use_ssh_forwarding = target_user.is_some() || is_remote_different;
 
-            if is_remote_different {
+            if use_ssh_forwarding {
                 // Forward through bastion to target remote host
                 if !sh_cmd.is_empty() {
                     sh_cmd.push_str(" && ");
                 }
-                sh_cmd.push_str(&format!(
-                    "gcloud compute ssh {}{} --quiet --ssh-flag=\"-N\" --ssh-flag=\"-L\" --ssh-flag=\"0.0.0.0:{}:{}:{}\" --ssh-flag=\"-o\" --ssh-flag=\"StrictHostKeyChecking=accept-new\"",
-                    instance, zone_flag, item.local_port, item.remote_bind, item.remote_port()
-                ));
+
+                if let Some(user) = target_user {
+                    // Direct SSH with ProxyCommand through IAP tunnel.
+                    // This bypasses OS Login and authenticates using standard metadata SSH keys.
+                    let key_arg = internal_ssh_key.as_deref().map(|k| format!("-i {} ", k)).unwrap_or_default();
+
+                    let proj_flag = item.project.as_ref().map(|p| format!(" --project={}", p)).unwrap_or_default();
+
+                    sh_cmd.push_str(&format!(
+                        "ssh {}-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -o \"ProxyCommand gcloud compute start-iap-tunnel {} %p --listen-on-stdin{}{} --verbosity=error\" -N -L 0.0.0.0:{}:{}:{} {}@{}",
+                        key_arg,
+                        instance,
+                        proj_flag,
+                        zone_flag,
+                        item.local_port,
+                        item.remote_bind,
+                        item.remote_port(),
+                        user,
+                        instance
+                    ));
+                } else {
+                    // Fallback to gcloud compute ssh if no user is specified (for OS Login users)
+                    sh_cmd.push_str(&format!(
+                        "gcloud compute ssh {}{} --quiet --ssh-flag=\"-N\" --ssh-flag=\"-L\" --ssh-flag=\"0.0.0.0:{}:{}:{}\" --ssh-flag=\"-o\" --ssh-flag=\"StrictHostKeyChecking=accept-new\"",
+                        instance, zone_flag, item.local_port, item.remote_bind, item.remote_port()
+                    ));
+                }
             } else {
                 // Direct IAP tunnel to instance
                 if !sh_cmd.is_empty() {

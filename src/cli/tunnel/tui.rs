@@ -956,6 +956,8 @@ mod tests {
                 project: Some("prj".to_string()),
                 zone: Some("zone".to_string()),
                 instance: Some("gcp-prod-v2".to_string()),
+                user: None,
+                ssh_key: None,
                 service_account_key: None,
                 image: None,
             }];
@@ -1002,6 +1004,8 @@ mod tests {
                 project: Some("prj".to_string()),
                 zone: Some("zone".to_string()),
                 instance: Some("ark".to_string()),
+                user: None,
+                ssh_key: None,
                 service_account_key: None,
                 image: None,
             }];
@@ -1059,6 +1063,8 @@ mod tests {
                 project: Some("prj".to_string()),
                 zone: Some("zone".to_string()),
                 instance: Some("gcp-prod-v2".to_string()),
+                user: None,
+                ssh_key: None,
                 service_account_key: None,
                 image: None,
             }];
@@ -1104,6 +1110,8 @@ mod tests {
             project: Some("prj".to_string()),
             zone: Some("zone".to_string()),
             instance: Some("ark".to_string()),
+            user: None,
+            ssh_key: None,
             service_account_key: None,
             image: None,
         };
