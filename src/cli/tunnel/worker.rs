@@ -225,17 +225,28 @@ pub fn run_worker(tunnel_target: &str) {
             c.arg("-e").arg("CLOUDSDK_CORE_DISABLE_PROMPTS=1");
 
             let mut internal_ssh_key = None;
+            let mut copy_prep_cmd = String::new();
 
             if let Some(ref k) = item.ssh_key {
-                let p = expand_tilde(k);
+                let mut p = expand_tilde(k);
+                // If user accidentally specified the public key (.pub), auto-detect the private key
+                if p.to_string_lossy().ends_with(".pub") {
+                    let s = p.to_string_lossy();
+                    let candidate = PathBuf::from(s.strip_suffix(".pub").unwrap_or(&s));
+                    if candidate.exists() {
+                        p = candidate;
+                    }
+                }
+
                 if p.exists() {
-                    // Directly mount host key into container as read-only
-                    c.arg("-v").arg(format!("{}:/root/.ssh/id_custom:ro", p.display()));
+                    // Directly mount host key into container as read-only source
+                    c.arg("-v").arg(format!("{}:/root/.ssh/id_custom_src:ro", p.display()));
                     let pub_p = PathBuf::from(format!("{}.pub", p.display()));
                     if pub_p.exists() {
                         c.arg("-v").arg(format!("{}:/root/.ssh/id_custom.pub:ro", pub_p.display()));
                     }
-                    internal_ssh_key = Some("/root/.ssh/id_custom".to_string());
+                    copy_prep_cmd = "cp -f /root/.ssh/id_custom_src /tmp/id_custom && chmod 600 /tmp/id_custom".to_string();
+                    internal_ssh_key = Some("/tmp/id_custom".to_string());
                 }
             } else {
                 // Fallback: persist / mount SSH keys in container to avoid regenerating keys every run
@@ -260,7 +271,8 @@ pub fn run_worker(tunnel_target: &str) {
                 }
 
                 if target_priv.exists() || host_gce_priv.exists() {
-                    internal_ssh_key = Some("/root/.ssh/google_compute_engine".to_string());
+                    copy_prep_cmd = "cp -f /root/.ssh/google_compute_engine /tmp/id_custom && chmod 600 /tmp/id_custom".to_string();
+                    internal_ssh_key = Some("/tmp/id_custom".to_string());
                 } else {
                     let host_ed25519 = expand_tilde("~/.ssh/id_ed25519");
                     let host_rsa = expand_tilde("~/.ssh/id_rsa");
@@ -274,7 +286,8 @@ pub fn run_worker(tunnel_target: &str) {
                             use std::os::unix::fs::PermissionsExt;
                             let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600));
                         }
-                        internal_ssh_key = Some("/root/.ssh/id_ed25519".to_string());
+                        copy_prep_cmd = "cp -f /root/.ssh/id_ed25519 /tmp/id_custom && chmod 600 /tmp/id_custom".to_string();
+                        internal_ssh_key = Some("/tmp/id_custom".to_string());
                     } else if host_rsa.exists() {
                         let target = ssh_dir.join("id_rsa");
                         if host_rsa != target {
@@ -285,7 +298,8 @@ pub fn run_worker(tunnel_target: &str) {
                             use std::os::unix::fs::PermissionsExt;
                             let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600));
                         }
-                        internal_ssh_key = Some("/root/.ssh/id_rsa".to_string());
+                        copy_prep_cmd = "cp -f /root/.ssh/id_rsa /tmp/id_custom && chmod 600 /tmp/id_custom".to_string();
+                        internal_ssh_key = Some("/tmp/id_custom".to_string());
                     }
                 }
 
@@ -346,6 +360,11 @@ pub fn run_worker(tunnel_target: &str) {
                 if let Some(user) = target_user {
                     // Direct SSH with ProxyCommand through IAP tunnel.
                     // This bypasses OS Login and authenticates using standard metadata SSH keys.
+                    if !copy_prep_cmd.is_empty() {
+                        sh_cmd.push_str(&copy_prep_cmd);
+                        sh_cmd.push_str(" && ");
+                    }
+
                     let key_arg = internal_ssh_key.as_deref().map(|k| format!("-i {} ", k)).unwrap_or_default();
 
                     let proj_flag = item.project.as_ref().map(|p| format!(" --project={}", p)).unwrap_or_default();
