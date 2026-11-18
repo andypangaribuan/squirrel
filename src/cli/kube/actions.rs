@@ -33,6 +33,13 @@ pub(super) fn exec_kube_action_diff(opt_value: &str, yml_templates: &[String], y
     }
 
     let (is_err, out) = util::exec_kube_stdin("kubectl diff -f -", &lines, cloud_sdk_container, false, false);
+    if is_err && !out.contains("diff -u -N ") && !out.starts_with("--- ") {
+        if !out.trim().is_empty() {
+            eprintln!("{}", color::red(out.trim()));
+        }
+        std::process::exit(1);
+    }
+
     let ignore_prefixes = ["diff -u -N /", "--- /", "+++ /", "@@ "];
     let filtered_lines: Vec<&str> = out.lines().filter(|line| !ignore_prefixes.iter().any(|prefix| line.starts_with(prefix))).collect();
 

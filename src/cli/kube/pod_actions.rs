@@ -79,16 +79,15 @@ pub(super) fn cli_kube_action_pods(
             let pod_name = get_target_pod_name(namespace, app_name, pod_arg, cloud_sdk_container);
             if !pod_name.is_empty() {
                 let mut shell = "sh";
-                let ns_str = if namespace.is_empty() { String::new() } else { format!("-n {}", namespace) };
-                let check_bash = format!("kubectl exec {} -c {} {} -- which bash", pod_name, app_name, ns_str);
+                let ns_flag = if namespace.is_empty() { String::new() } else { format!(" -n {}", namespace) };
+                let check_bash = format!("kubectl exec {} -c {}{} -- bash -c exit", pod_name, app_name, ns_flag);
                 let (err, _) = util::exec_kube(&check_bash, cloud_sdk_container, false, false);
                 if !err {
                     shell = "bash";
                 }
 
-                let ns_flag = if namespace.is_empty() { String::new() } else { format!(" -n {}", namespace) };
                 let exec_cmd = format!("kubectl exec -it {} -c {}{} -- {}", pod_name, app_name, ns_flag, shell);
-                util::exec_kube(&exec_cmd, cloud_sdk_container, false, true);
+                util::exec_kube_tty(&exec_cmd, cloud_sdk_container, false);
             }
         }
 
@@ -153,7 +152,7 @@ pub(super) fn cli_kube_action_pods(
                 "stern --color always {}{} -c {} -l app={} -t --since {}{} 2>&1 | sed -E -u \"s/{}-([a-zA-Z0-9-]+)/\\1/g; s/ ({}\\[[0-9;]*m)*{}({}\\[[0-9;]*m)*//g; s/ ›.*$//g;{} s/([0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}})T([0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}})\\.[0-9]+([+-][0-9]{{2}}:[0-9]{{2}}|Z)/{}\\[34m\\1 \\2 \\3{}\\[0m/g\"",
                 ns_flag, app_name, app_name, app_name, since, exclude_flags, app_name, esc, app_name, esc, hide_app_dt_sed, esc, esc
             );
-            util::exec_kube(&stern_cmd, cloud_sdk_container, false, true);
+            util::exec_kube_stream(&stern_cmd, cloud_sdk_container, false);
         }
 
         "events" => {
@@ -213,7 +212,13 @@ fn get_target_pod_name(namespace: &str, app_name: &str, pod_arg: &str, cloud_sdk
     };
 
     let (err, out) = util::exec_kube(&cmd, cloud_sdk_container, false, false);
-    if err || out.is_empty() {
+    if err {
+        if !out.trim().is_empty() {
+            eprintln!("{}", color::red(out.trim()));
+        }
+        std::process::exit(1);
+    }
+    if out.is_empty() {
         return String::new();
     }
 
@@ -234,7 +239,13 @@ fn exec_pods_events(namespace: &str, app_name: &str, cloud_sdk_container: &str) 
     };
 
     let (err, out) = util::exec_kube(&cmd, cloud_sdk_container, false, false);
-    if err || out.is_empty() {
+    if err {
+        if !out.trim().is_empty() {
+            eprintln!("{}", color::red(out.trim()));
+        }
+        std::process::exit(1);
+    }
+    if out.is_empty() {
         return;
     }
 
@@ -256,7 +267,14 @@ fn exec_pods_events(namespace: &str, app_name: &str, cloud_sdk_container: &str) 
                 format!("kubectl describe pods -n {} {}", ns, pod_name)
             };
 
-            let (_, desc_out) = util::exec_kube(&desc_cmd, &container, false, false);
+            let (desc_err, desc_out) = util::exec_kube(&desc_cmd, &container, false, false);
+            if desc_err {
+                let mut header = color::bold_green(&pod_name);
+                if !desc_out.trim().is_empty() {
+                    header.push_str(&format!("\n{}", color::red(desc_out.trim())));
+                }
+                return header;
+            }
             let lines: Vec<&str> = desc_out.lines().collect();
 
             let mut last_state = String::new();
@@ -329,6 +347,7 @@ fn exec_pods_events(namespace: &str, app_name: &str, cloud_sdk_container: &str) 
 fn get_info_pods(namespace: &str, app_name: &str, cloud_sdk_container: &str) -> String {
     let hpa_res = Arc::new(Mutex::new((Vec::<String>::new(), Vec::<Vec<String>>::new())));
     let pod_items_res = Arc::new(Mutex::new(Vec::<Vec<String>>::new()));
+    let pod_err_res = Arc::new(Mutex::new(String::new()));
     let top_items_res = Arc::new(Mutex::new(HashMap::<String, (String, String)>::new()));
     let img_items_res = Arc::new(Mutex::new(HashMap::<String, (String, String)>::new()));
 
@@ -371,11 +390,17 @@ fn get_info_pods(namespace: &str, app_name: &str, cloud_sdk_container: &str) -> 
         let app = app_name.to_string();
         let container = cloud_sdk_container.to_string();
         let pod_items_clone = Arc::clone(&pod_items_res);
+        let pod_err_clone = Arc::clone(&pod_err_res);
         handles.push(thread::spawn(move || {
             let cmd =
                 if ns.is_empty() { format!("kubectl get pod -l app={}", app) } else { format!("kubectl get pod -n {} -l app={}", ns, app) };
             let (err, out) = util::exec_kube(&cmd, &container, false, false);
-            if !err && !out.is_empty() {
+            if err {
+                if !out.to_lowercase().contains("no resources found") && !out.trim().is_empty() {
+                    let mut guard = pod_err_clone.lock().unwrap();
+                    *guard = out.trim().to_string();
+                }
+            } else if !out.is_empty() {
                 let hdrs = vec!["NAME", "READY", "STATUS", "RESTARTS", "AGE"];
                 let loaded = util::table_loader(&out, &hdrs);
                 let items = util::table_to_items(&loaded, &hdrs);
@@ -450,8 +475,13 @@ fn get_info_pods(namespace: &str, app_name: &str, cloud_sdk_container: &str) -> 
 
     let (hpa_headers, hpa_rows) = Arc::try_unwrap(hpa_res).unwrap().into_inner().unwrap();
     let pod_rows = Arc::try_unwrap(pod_items_res).unwrap().into_inner().unwrap();
+    let pod_err = Arc::try_unwrap(pod_err_res).unwrap().into_inner().unwrap();
     let top_map = Arc::try_unwrap(top_items_res).unwrap().into_inner().unwrap();
     let img_map = Arc::try_unwrap(img_items_res).unwrap().into_inner().unwrap();
+
+    if pod_rows.is_empty() && !pod_err.is_empty() {
+        return color::red(&pod_err);
+    }
 
     let mut combined: Vec<(String, Vec<String>)> = Vec::new();
     let prefix = format!("{}-", app_name);

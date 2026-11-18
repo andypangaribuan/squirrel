@@ -183,21 +183,34 @@ pub(super) fn cli_kube_action(args: &[String]) {
         kubeconfig_path = envs.get(&kubeconfig_path).cloned().unwrap_or_default();
     }
 
+    if let Some(timeout_val) = envs.get("KYML_KUBE_TIMEOUT")
+        && std::env::var("KYML_KUBE_TIMEOUT").is_err()
+    {
+        unsafe {
+            std::env::set_var("KYML_KUBE_TIMEOUT", timeout_val);
+        }
+    }
+
     if !cluster_name.is_empty() {
-        let get_current_ctx = |cloud_container: &str| -> String {
+        let get_current_ctx = |cloud_container: &str| -> (bool, String) {
             let (err, out) = util::exec_kube("kubectl config current-context", cloud_container, false, false);
-            if err { String::new() } else { out.trim().to_string() }
+            (err, out.trim().to_string())
         };
 
-        let mut active_ctx = get_current_ctx(&cloud_sdk_container);
+        let (mut ctx_err, mut ctx_out) = get_current_ctx(&cloud_sdk_container);
+        let mut active_ctx = if ctx_err { String::new() } else { ctx_out.clone() };
         if active_ctx != cluster_name {
             if !kubeconfig_path.is_empty() {
                 unsafe {
                     std::env::set_var("KUBECONFIG", &kubeconfig_path);
                 }
-                active_ctx = get_current_ctx(&cloud_sdk_container);
+                (ctx_err, ctx_out) = get_current_ctx(&cloud_sdk_container);
+                active_ctx = if ctx_err { String::new() } else { ctx_out.clone() };
             }
             if active_ctx != cluster_name {
+                if ctx_err && !ctx_out.is_empty() {
+                    eprintln!("{}", color::red(&ctx_out));
+                }
                 eprintln!(
                     "Cluster name mismatch: active context is '{}', but expected '{}'",
                     if active_ctx.is_empty() { "none" } else { &active_ctx },
@@ -344,6 +357,15 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
     util::print(msg);
 }
 
+fn is_kube_not_found(out: &str) -> bool {
+    let lower = out.to_lowercase();
+    lower.contains("no resources found")
+        || lower.contains("(notfound)")
+        || lower.contains("not found")
+        || lower.contains("doesn't have a resource type")
+        || lower.contains("could not find the requested resource")
+}
+
 fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud_sdk_container: &str) {
     let working_dir = help::get_working_directory();
     let envs = help::get_envs(&working_dir);
@@ -367,7 +389,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
     ];
 
     let mut handles = Vec::new();
-    let results = Arc::new(Mutex::new(HashMap::<String, (String, String)>::new()));
+    let results = Arc::new(Mutex::new(HashMap::<String, (bool, String, String)>::new()));
 
     for (yml_code, kube_key, _) in resource_keys {
         if !ymls.contains(&yml_code.to_string()) {
@@ -410,13 +432,21 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
             }
 
             let (err, mut out1) = util::exec_kube(&script, &cloud_container, false, false);
-            if err || out1.to_lowercase().contains("no resources found") {
+            let mut has_err = false;
+            if err {
+                if is_kube_not_found(&out1) {
+                    out1 = String::new();
+                } else {
+                    has_err = true;
+                    out1 = color::red(out1.trim());
+                }
+            } else if is_kube_not_found(&out1) {
                 out1 = String::new();
             }
 
             let mut out2 = String::new();
 
-            if key == "svc" && !out1.is_empty() {
+            if !has_err && key == "svc" && !out1.is_empty() {
                 let mut endpoint = String::new();
                 let hdrs = vec!["NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"];
                 let loaded = util::table_loader(&out1, &hdrs);
@@ -428,8 +458,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                         } else {
                             format!("kubectl get ep --field-selector metadata.name={} -n {}", app, ns)
                         };
-                        let (_, ep_out) = util::exec_kube(&ep_script, &cloud_container, false, false);
-                        if !ep_out.is_empty() {
+                        let (ep_err, ep_out) = util::exec_kube(&ep_script, &cloud_container, false, false);
+                        if !ep_err && !ep_out.is_empty() {
                             let ep_hdrs = vec!["NAME", "ENDPOINTS", "AGE"];
                             let ep_loaded = util::table_loader(&ep_out, &ep_hdrs);
                             let endpoints: Vec<String> = ep_loaded.iter().filter_map(|r| r.get("ENDPOINTS").cloned()).collect();
@@ -458,19 +488,19 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                 }
             }
 
-            if key == "ing" {
+            if !has_err && key == "ing" {
                 let ing_script = if ns.is_empty() {
                     format!("kubectl get ing --field-selector metadata.name={}-grpc", app)
                 } else {
                     format!("kubectl get ing --field-selector metadata.name={}-grpc -n {}", app, ns)
                 };
-                let (_, ing_out) = util::exec_kube(&ing_script, &cloud_container, false, false);
-                if !ing_out.to_lowercase().contains("no resources found") {
+                let (ing_err, ing_out) = util::exec_kube(&ing_script, &cloud_container, false, false);
+                if !ing_err && !is_kube_not_found(&ing_out) {
                     out2 = ing_out.trim().to_string();
                 }
             }
 
-            if key == "net" {
+            if !has_err && key == "net" {
                 let mut entries: Vec<(String, String, String)> = Vec::new();
                 let hdrs = vec!["NAME", "AGE"];
 
@@ -490,8 +520,8 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                 } else {
                     format!("kubectl get healthcheckpolicy --field-selector metadata.name={} -n {}", app, ns)
                 };
-                let (_, hc_out) = util::exec_kube(&hc_script, &cloud_container, false, false);
-                if !hc_out.to_lowercase().contains("no resources found") && !hc_out.trim().is_empty() {
+                let (hc_err, hc_out) = util::exec_kube(&hc_script, &cloud_container, false, false);
+                if !hc_err && !is_kube_not_found(&hc_out) && !hc_out.trim().is_empty() {
                     let loaded = util::table_loader(&hc_out, &hdrs);
                     for row in loaded {
                         let name = row.get("NAME").cloned().unwrap_or_default();
@@ -528,31 +558,37 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                 }
             }
 
-            if key == "gate" && !out1.is_empty() {
+            if !has_err && key == "gate" && !out1.is_empty() {
                 out1 = format!("{}\n{}", color::cyan("HTTPRoute"), out1.trim());
             }
 
-            if key == "pv" && out1.is_empty() {
+            if !has_err && key == "pv" && out1.is_empty() {
                 let script2 = format!("kubectl get pv --field-selector metadata.name={}-pv", app);
-                let (_, o2) = util::exec_kube(&script2, &cloud_container, false, false);
-                out1 = o2;
+                let (e2, o2) = util::exec_kube(&script2, &cloud_container, false, false);
+                if !e2 && !is_kube_not_found(&o2) {
+                    out1 = o2;
+                }
 
                 if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PV_NAME) {
                     let pv_name = &envs_map[var::KEY_KYML_PV_NAME];
                     let script3 = format!("kubectl get pv --field-selector metadata.name={}", pv_name);
-                    let (_, o3) = util::exec_kube(&script3, &cloud_container, false, false);
-                    out1 = o3;
+                    let (e3, o3) = util::exec_kube(&script3, &cloud_container, false, false);
+                    if !e3 && !is_kube_not_found(&o3) {
+                        out1 = o3;
+                    }
                 }
             }
 
-            if key == "pvc" && out1.is_empty() {
+            if !has_err && key == "pvc" && out1.is_empty() {
                 let script2 = if ns.is_empty() {
                     format!("kubectl get pvc --field-selector metadata.name={}-pvc", app)
                 } else {
                     format!("kubectl get pvc --field-selector metadata.name={}-pvc -n {}", app, ns)
                 };
-                let (_, o2) = util::exec_kube(&script2, &cloud_container, false, false);
-                out1 = o2;
+                let (e2, o2) = util::exec_kube(&script2, &cloud_container, false, false);
+                if !e2 && !is_kube_not_found(&o2) {
+                    out1 = o2;
+                }
 
                 if out1.is_empty() && envs_map.contains_key(var::KEY_KYML_PVC_NAME) {
                     let pvc_name = &envs_map[var::KEY_KYML_PVC_NAME];
@@ -561,8 +597,10 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
                     } else {
                         format!("kubectl get pvc --field-selector metadata.name={} -n {}", pvc_name, ns)
                     };
-                    let (_, o3) = util::exec_kube(&script3, &cloud_container, false, false);
-                    out1 = o3;
+                    let (e3, o3) = util::exec_kube(&script3, &cloud_container, false, false);
+                    if !e3 && !is_kube_not_found(&o3) {
+                        out1 = o3;
+                    }
                 }
             }
 
@@ -571,7 +609,7 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
             }
 
             let mut guard = res_clone.lock().unwrap();
-            guard.insert(key, (out1, out2));
+            guard.insert(key, (has_err, out1, out2));
         }));
     }
 
@@ -584,9 +622,9 @@ fn exec_kube_action_conf(namespace: &str, app_name: &str, ymls: &[String], cloud
 
     for yml_code in ymls {
         if let Some((_, kube_key, title)) = resource_keys.iter().find(|(c, _, _)| c == yml_code) {
-            let (out1, out2) = map_res.get(*kube_key).cloned().unwrap_or((nil_message.clone(), String::new()));
+            let (has_err, out1, out2) = map_res.get(*kube_key).cloned().unwrap_or((false, nil_message.clone(), String::new()));
 
-            let title_colored = if out1 == nil_message && (out2 == nil_message || out2.is_empty()) {
+            let title_colored = if has_err || (out1 == nil_message && (out2 == nil_message || out2.is_empty())) {
                 color::bold_red(title)
             } else {
                 color::bold_green(title)

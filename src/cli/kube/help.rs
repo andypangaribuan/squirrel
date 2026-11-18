@@ -508,6 +508,12 @@ pub(super) fn exec_kube_secret_diff(local_yaml: &str, cloud_sdk_container: &str)
     };
 
     let (err, out) = util::exec_kube(&script, cloud_sdk_container, false, false);
+    if err && !out.contains("(NotFound)") && !out.to_lowercase().contains("not found") {
+        if !out.trim().is_empty() {
+            eprintln!("{}", color::red(out.trim()));
+        }
+        std::process::exit(1);
+    }
     let cluster_raw_map = if !err && !out.contains("(NotFound)") && !out.is_empty() { parse_secret_data(&out) } else { HashMap::new() };
 
     let mut cluster_map = HashMap::new();
