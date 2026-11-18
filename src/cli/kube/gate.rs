@@ -191,37 +191,33 @@ pub(super) fn cli_kube_action(args: &[String]) {
         }
     }
 
+    if !kubeconfig_path.is_empty() {
+        unsafe {
+            std::env::set_var("KUBECONFIG", &kubeconfig_path);
+        }
+    }
+
     if !cluster_name.is_empty() {
-        let get_current_ctx = |cloud_container: &str| -> (bool, String) {
-            let (err, out) = util::exec_kube("kubectl config current-context", cloud_container, false, false);
+        let (ctx_err, ctx_out) = if cloud_sdk_container.is_empty()
+            && let Some(local_ctx) = read_local_kubeconfig_context(&kubeconfig_path)
+        {
+            (false, local_ctx)
+        } else {
+            let (err, out) = util::exec_kube("kubectl config current-context", &cloud_sdk_container, false, false);
             (err, out.trim().to_string())
         };
 
-        let (mut ctx_err, mut ctx_out) = get_current_ctx(&cloud_sdk_container);
-        let mut active_ctx = if ctx_err { String::new() } else { ctx_out.clone() };
+        let active_ctx = if ctx_err { String::new() } else { ctx_out.clone() };
         if active_ctx != cluster_name {
-            if !kubeconfig_path.is_empty() {
-                unsafe {
-                    std::env::set_var("KUBECONFIG", &kubeconfig_path);
-                }
-                (ctx_err, ctx_out) = get_current_ctx(&cloud_sdk_container);
-                active_ctx = if ctx_err { String::new() } else { ctx_out.clone() };
+            if ctx_err && !ctx_out.is_empty() {
+                eprintln!("{}", color::red(&ctx_out));
             }
-            if active_ctx != cluster_name {
-                if ctx_err && !ctx_out.is_empty() {
-                    eprintln!("{}", color::red(&ctx_out));
-                }
-                eprintln!(
-                    "Cluster name mismatch: active context is '{}', but expected '{}'",
-                    if active_ctx.is_empty() { "none" } else { &active_ctx },
-                    cluster_name
-                );
-                std::process::exit(1);
-            }
-        }
-    } else if !kubeconfig_path.is_empty() {
-        unsafe {
-            std::env::set_var("KUBECONFIG", &kubeconfig_path);
+            eprintln!(
+                "Cluster name mismatch: active context is '{}', but expected '{}'",
+                if active_ctx.is_empty() { "none" } else { &active_ctx },
+                cluster_name
+            );
+            std::process::exit(1);
         }
     }
 
@@ -355,6 +351,41 @@ fn exec_kube_action_show(is_verbose: bool, ymls: &[String]) {
     }
 
     util::print(msg);
+}
+
+fn extract_yaml_current_context(content: &str) -> Option<String> {
+    for line in content.lines() {
+        if line.starts_with(' ') || line.starts_with('\t') {
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("current-context:") {
+            let val = rest.split('#').next().unwrap_or("").trim().trim_matches('"').trim_matches('\'').trim();
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn read_local_kubeconfig_context(explicit_path: &str) -> Option<String> {
+    let target_path = if !explicit_path.is_empty() {
+        explicit_path.to_string()
+    } else if let Ok(env_kc) = std::env::var("KUBECONFIG")
+        && !env_kc.trim().is_empty()
+    {
+        let trimmed = env_kc.trim();
+        if trimmed.contains(':') {
+            return None;
+        }
+        trimmed.to_string()
+    } else {
+        let home = std::env::var("HOME").ok()?;
+        format!("{}/.kube/config", home)
+    };
+
+    let content = std::fs::read_to_string(target_path).ok()?;
+    extract_yaml_current_context(&content)
 }
 
 fn is_kube_not_found(out: &str) -> bool {

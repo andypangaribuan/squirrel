@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, Stdio};
 use std::sync::{
-    Arc,
+    Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
 };
 use std::thread;
@@ -38,17 +38,64 @@ fn custom_kube_timeout_secs() -> Option<u64> {
     if parsed > 0 { Some(parsed) } else { None }
 }
 
-fn prepare_kube_command(cmd: &str) -> (String, Duration) {
+fn select_direct_kubectl_from_dir(dir: &std::path::Path) -> Option<String> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    let mut candidates: Vec<(u32, String)> = Vec::new();
+    for entry in entries.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else { continue };
+        if let Some(minor_str) = name.strip_prefix("kubectl.1.")
+            && let Ok(minor) = minor_str.parse::<u32>()
+        {
+            candidates.push((minor, entry.path().to_string_lossy().to_string()));
+        }
+    }
+    candidates.sort_by_key(|(minor, _)| *minor);
+    if candidates.len() >= 2 { Some(candidates[candidates.len() - 2].1.clone()) } else { candidates.pop().map(|(_, path)| path) }
+}
+
+fn resolve_host_kubectl_bin() -> &'static str {
+    static HOST_KUBECTL: OnceLock<String> = OnceLock::new();
+    HOST_KUBECTL.get_or_init(|| {
+        if let Ok(custom) = std::env::var("SQ_KUBECTL_BIN") {
+            let trimmed = custom.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
+            }
+        }
+
+        if let Ok(path_var) = std::env::var("PATH") {
+            for dir in std::env::split_paths(&path_var) {
+                let candidate = dir.join("kubectl");
+                if candidate.is_file() {
+                    if let Ok(canon) = std::fs::canonicalize(&candidate)
+                        && canon.to_string_lossy().ends_with("google-cloud-sdk/bin/kubectl")
+                        && let Some(parent) = canon.parent()
+                        && let Some(direct_bin) = select_direct_kubectl_from_dir(parent)
+                    {
+                        return direct_bin;
+                    }
+                    break;
+                }
+            }
+        }
+
+        "kubectl".to_string()
+    })
+}
+
+fn prepare_kube_command(cmd: &str, use_host_kubectl: bool) -> (String, Duration) {
     let trimmed = cmd.trim();
     let Some(rest) = trimmed.strip_prefix("kubectl ") else {
         let secs = custom_kube_timeout_secs().unwrap_or(15);
         return (trimmed.to_string(), Duration::from_secs(secs + 4));
     };
 
+    let kube_bin = if use_host_kubectl { resolve_host_kubectl_bin() } else { "kubectl" };
     let sub = rest.trim_start();
 
     if sub.starts_with("config ") {
-        return (trimmed.to_string(), Duration::from_secs(5));
+        return (format!("{} {}", kube_bin, sub), Duration::from_secs(5));
     }
 
     let is_mutating = sub.starts_with("apply ")
@@ -61,14 +108,17 @@ fn prepare_kube_command(cmd: &str) -> (String, Duration) {
     let hard_timeout = Duration::from_secs(req_secs + 4);
 
     if sub.contains("--request-timeout") {
-        (trimmed.to_string(), hard_timeout)
+        (format!("{} {}", kube_bin, sub), hard_timeout)
     } else {
-        (format!("kubectl --request-timeout={}s {}", req_secs, sub), hard_timeout)
+        (format!("{} --request-timeout={}s {}", kube_bin, req_secs, sub), hard_timeout)
     }
 }
 
 pub fn wrap_kube_tty_cmd(cmd: &str, cloud_sdk_container: &str) -> String {
     if cloud_sdk_container.is_empty() {
+        if let Some(rest) = cmd.trim().strip_prefix("kubectl ") {
+            return format!("{} {}", resolve_host_kubectl_bin(), rest.trim_start());
+        }
         return cmd.to_string();
     }
 
@@ -359,7 +409,7 @@ pub fn exec_kube(cmd: &str, cloud_sdk_container: &str, check: bool, show_output:
         return exec_kube_tty(cmd, cloud_sdk_container, check);
     }
 
-    let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd);
+    let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd, cloud_sdk_container.is_empty());
     let wrapped = wrap_kube_watched_cmd(&prepared_cmd, cloud_sdk_container);
 
     let mut last_err = false;
@@ -492,12 +542,12 @@ pub fn exec_stdin(cmd: &str, stdin_data: &str, check: bool, show_output: bool) -
 
 pub fn exec_kube_stdin(cmd: &str, stdin_data: &str, cloud_sdk_container: &str, check: bool, show_output: bool) -> (bool, String) {
     if show_output {
-        let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd);
+        let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd, cloud_sdk_container.is_empty());
         let wrapped = wrap_kube_stdin_cmd(&prepared_cmd, cloud_sdk_container, hard_timeout.as_secs());
         return exec_stdin(&wrapped, stdin_data, check, true);
     }
 
-    let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd);
+    let (prepared_cmd, hard_timeout) = prepare_kube_command(cmd, cloud_sdk_container.is_empty());
     let wrapped = wrap_kube_stdin_cmd(&prepared_cmd, cloud_sdk_container, hard_timeout.as_secs());
 
     let mut last_err = false;
@@ -739,20 +789,35 @@ mod tests {
 
     #[test]
     fn test_prepare_kube_command() {
-        let (cmd, timeout) = prepare_kube_command("kubectl get pod -n partner");
+        let (cmd, timeout) = prepare_kube_command("kubectl get pod -n partner", false);
         assert_eq!(cmd, "kubectl --request-timeout=6s get pod -n partner");
         assert_eq!(timeout, Duration::from_secs(10));
 
-        let (cmd_apply, timeout_apply) = prepare_kube_command("kubectl apply -f -");
+        let (cmd_apply, timeout_apply) = prepare_kube_command("kubectl apply -f -", false);
         assert_eq!(cmd_apply, "kubectl --request-timeout=15s apply -f -");
         assert_eq!(timeout_apply, Duration::from_secs(19));
 
-        let (cmd_cfg, timeout_cfg) = prepare_kube_command("kubectl config current-context");
+        let (cmd_cfg, timeout_cfg) = prepare_kube_command("kubectl config current-context", false);
         assert_eq!(cmd_cfg, "kubectl config current-context");
         assert_eq!(timeout_cfg, Duration::from_secs(5));
 
-        let (cmd_existing, _) = prepare_kube_command("kubectl get pod --request-timeout=3s");
+        let (cmd_existing, _) = prepare_kube_command("kubectl get pod --request-timeout=3s", false);
         assert_eq!(cmd_existing, "kubectl get pod --request-timeout=3s");
+    }
+
+    #[test]
+    fn test_select_direct_kubectl_from_dir() {
+        let tmp = std::env::temp_dir().join(format!("sq_kubectl_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("kubectl"), "").unwrap();
+        std::fs::write(tmp.join("kubectl.1.35"), "").unwrap();
+        std::fs::write(tmp.join("kubectl.1.36"), "").unwrap();
+        std::fs::write(tmp.join("kubectl.1.37"), "").unwrap();
+
+        let chosen = select_direct_kubectl_from_dir(&tmp).unwrap();
+        assert!(chosen.ends_with("kubectl.1.36"));
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
