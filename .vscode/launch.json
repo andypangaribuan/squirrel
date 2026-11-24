@@ -8,7 +8,8 @@
       "program": "${workspaceFolder}/target/debug/sq",
       "cwd": "${workspaceFolder}",
       "env": {
-        "RUSTUP_HOME": "${workspaceFolder}/.rustup",
+        "RUSTUP_HOME": "${env:HOME}/.devbox/global/rust-1.100/.rustup",
+        "CARGO_HOME": "${env:HOME}/.devbox/global/rust-1.100/.cargo",
         "LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.100/.devbox/nix/profile/default/lib",
         "DYLD_LIBRARY_PATH": "${env:HOME}/.devbox/global/rust-1.100/.devbox/nix/profile/default/lib",
         "DEVELOPER_DIR": "/Library/Developer/CommandLineTools",
