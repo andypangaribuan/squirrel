@@ -1,6 +1,16 @@
-# Squirrel
+# Squirrel (`sq`)
 
-sq (squirrel) cli app for more better command
+`sq` (Squirrel) is a fast, single-binary Rust CLI toolkit (`v2.1.15`) for Kubernetes operations, YAML templating & local secret encryption, SSH/GCP tunnel management, formatted Docker output, `fzf` menu selection, and `.taskfile` execution.
+
+## Documentation
+
+- **PDF Guide:** [docs/squirrel-guide.pdf](./docs/squirrel-guide.pdf)
+- **Markdown Knowledge Base (Single Source of Truth):** [md/README.md](./md/README.md)
+  - [01 — CLI Overview & Architecture](./md/01-cli-overview-and-architecture.md)
+  - [02 — Kubernetes (`sq kube`) & Secret Management (`sq y-secret`)](./md/02-kube-and-secrets.md)
+  - [03 — Tunnel Manager (`sq tunnel`)](./md/03-tunnel-manager.md)
+  - [04 — Docker, Choose & Taskfile](./md/04-docker-choose-taskfile.md)
+- **AI Agent Rules:** [AGENTS.md](./AGENTS.md)
 
 ## Installing
 
@@ -14,15 +24,45 @@ sudo chmod +x /usr/local/bin/sq
 
 ```sh
 sq --help
+sq --version
 ```
 
-## Third party package
+| Command | Description |
+| :--- | :--- |
+| `sq choose` | Interactive fuzzy item selector with `fzf` |
+| `sq docker` | Clean formatted `docker ps` (`-c/--compact`) and `docker images` (`-c/--contains`) |
+| `sq kube` | Kubernetes pod viewer, YAML template renderer, `apply`/`diff`/`delete`/`conf`/`secret`, and pod ops |
+| `sq ls` | Colorized tree-formatted directory & file listing (`--d<N>` depth, `--size` recursive sizes) |
+| `sq prereq` | Shows third-party CLI prerequisite status and install commands for the current OS (macOS / Debian Linux) |
+| `sq ssh` | Interactive `fzf` SSH host selector grouped by `~/.ssh/config` and `~/.ssh/config.d` |
+| `sq taskfile` | Parses and executes `#: ` documented functions in `.taskfile` |
+| `sq tunnel` | Interactive TUI (`--min`) and background daemon for SSH, GCloud IAP, and Cloud SQL Proxy tunnels |
+| `sq y-secret` | Recursively scans for unencrypted `.secret.yml` files (`-x` to encrypt with AES-256-GCM) |
 
-This sq cli using 3rd party package, you can install using brew:
+## Third-Party Packages
 
-- watch (brew install watch)
-- expect (brew install expect), this for unbuffer cli
-- kubectl (brew install kubernetes-cli)
+Run `sq prereq` to check installed tools and view install instructions for your current OS (macOS or Debian Linux).
+
+Common optional dependencies:
+
+- `fzf` — for `sq choose` and `sq ssh`
+- `watch` — for `sq kube pods --watch` / `events --watch`
+- `expect` (`unbuffer`) — for colored `sq kube` watch output
+- `kubectl` — for `sq kube`
+- `stern` — for `sq kube action ... pods logs`
+- `docker` — for `sq docker`, `sq tunnel` (GCloud/Cloud SQL), and `sq kube --cloud-sdk-container`
+
+## Development (Global Devbox Rust `1.100`)
+
+This project uses Rust `1.100.0` via global Devbox (`~/.devbox/global/rust-1.100/devbox.json`). All Rust commands in `.taskfile` automatically execute inside Devbox:
+
+```sh
+./.taskfile shell       # Open Devbox shell (starts Nix daemon if needed)
+./.taskfile check       # cargo check, build, clippy, and rustfmt check
+./.taskfile test        # Run unit tests
+./.taskfile release     # Build release binary (.releases/sq-darwin-arm64)
+./.taskfile cp-release  # Install release binary to /usr/local/bin/sq
+```
 
 ## Versioning
 

@@ -25,6 +25,9 @@ fn main() {
         "choose" => cli::choose::run(&args[1..]),
         "docker" => cli::docker::run(&args[1..]),
         "kube" => cli::kube::run(&args[1..]),
+        "ls" => cli::ls::run(&args[1..]),
+        "prereq" => cli::prereq::run(&args[1..]),
+        "ssh" => cli::ssh::run(&args[1..]),
         "taskfile" => cli::taskfile::run(&args[1..]),
         "tunnel" => cli::tunnel::run(&args[1..]),
         "y-secret" => cli::y_secret::run(&args[1..]),
@@ -44,6 +47,9 @@ usage: sq
   choose     interactive selector with fzf
   docker     execute docker cli
   kube       execute kubectl cli
+  ls         show files and directories in a tree list
+  prereq     show third-party CLI prerequisites for current OS
+  ssh        interactively select and connect to an SSH host
   taskfile   execute taskfile cli
   tunnel     manage ssh and gcloud tunnels
   y-secret   scan for unencrypted .secret.yml files"#

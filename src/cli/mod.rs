@@ -10,6 +10,9 @@
 pub mod choose;
 pub mod docker;
 pub mod kube;
+pub mod ls;
+pub mod prereq;
+pub mod ssh;
 pub mod taskfile;
 pub mod tunnel;
 pub mod y_secret;
