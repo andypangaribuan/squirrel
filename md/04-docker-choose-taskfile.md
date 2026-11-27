@@ -128,7 +128,7 @@ sq ssh [host] [-h|--help]
 - Without arguments:
   - Parses non-wildcard `Host` entries (skipping tokens containing `*`, `?`, or `!`) from `~/.ssh/config` (section `config`) and each non-hidden regular file in `~/.ssh/config.d`.
   - Launches `fzf` with live reload powered by internal `sq ssh _filter {q}` (multi-term fuzzy subsequence matching across section name and host alias).
-  - Section headers (`H`) remain visible during filtering and are automatically skipped on arrow/Ctrl-N/Ctrl-P navigation and cannot be selected.
+  - Section headers (`H`) and blank section separators (`S`) remain visible during filtering, are automatically skipped on arrow/Ctrl-N/Ctrl-P navigation, and cannot be selected.
   - Falls back to printing the grouped host list when `fzf` is not installed.
 
 ---

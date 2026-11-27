@@ -62,17 +62,17 @@ pub fn run(args: &[String]) {
         .arg("--bind")
         .arg("load:pos(2)")
         .arg("--bind")
-        .arg("down:down+transform:[ {1} = H ] && echo down")
+        .arg("down:down+transform:case {1} in S) echo down+down ;; H) echo down ;; esac")
         .arg("--bind")
-        .arg("ctrl-n:down+transform:[ {1} = H ] && echo down")
+        .arg("ctrl-n:down+transform:case {1} in S) echo down+down ;; H) echo down ;; esac")
         .arg("--bind")
-        .arg("ctrl-j:down+transform:[ {1} = H ] && echo down")
+        .arg("ctrl-j:down+transform:case {1} in S) echo down+down ;; H) echo down ;; esac")
         .arg("--bind")
-        .arg("up:up+transform:[ {1} = H ] && { [ \"$FZF_POS\" -eq 1 ] && echo down || echo up; }")
+        .arg("up:up+transform:case {1} in H) [ \"$FZF_POS\" -eq 1 ] && echo down || echo up+up ;; S) echo up ;; esac")
         .arg("--bind")
-        .arg("ctrl-p:up+transform:[ {1} = H ] && { [ \"$FZF_POS\" -eq 1 ] && echo down || echo up; }")
+        .arg("ctrl-p:up+transform:case {1} in H) [ \"$FZF_POS\" -eq 1 ] && echo down || echo up+up ;; S) echo up ;; esac")
         .arg("--bind")
-        .arg("ctrl-k:up+transform:[ {1} = H ] && { [ \"$FZF_POS\" -eq 1 ] && echo down || echo up; }")
+        .arg("ctrl-k:up+transform:case {1} in H) [ \"$FZF_POS\" -eq 1 ] && echo down || echo up+up ;; S) echo up ;; esac")
         .arg("--bind")
         .arg("enter:transform:[ {1} = I ] && echo accept")
         .arg("--bind")
@@ -244,6 +244,9 @@ fn render_filtered(entries: &[(String, String)], query: &str) -> String {
         }
 
         if sec.as_str() != last_sec {
+            if !last_sec.is_empty() {
+                out.push_str("S\t \t\n");
+            }
             out.push_str(&format!("H\t\x1b[1;96m{}\x1b[0m\t\n", sec));
             last_sec = sec.as_str();
         }
@@ -303,10 +306,11 @@ host=staging-db
 
         let rendered = render_filtered(&entries, "prod");
         let lines: Vec<&str> = rendered.lines().collect();
-        assert_eq!(lines.len(), 4);
+        assert_eq!(lines.len(), 5);
         assert!(lines[0].starts_with("H\t") && lines[0].contains("config"));
         assert!(lines[1].starts_with("I\t") && lines[1].ends_with("\tbastion-prod"));
-        assert!(lines[2].starts_with("H\t") && lines[2].contains("work"));
-        assert!(lines[3].starts_with("I\t") && lines[3].ends_with("\tapi-prod"));
+        assert_eq!(lines[2], "S\t \t");
+        assert!(lines[3].starts_with("H\t") && lines[3].contains("work"));
+        assert!(lines[4].starts_with("I\t") && lines[4].ends_with("\tapi-prod"));
     }
 }
