@@ -143,3 +143,36 @@ Displays third-party CLI prerequisites used by `sq`, checks whether each binary 
 ```bash
 sq prereq
 ```
+
+---
+
+## 7. Git Shortcuts (`sq gitz`, `sq gits`, `sq gitp`, `sq gitr`, `sq gitb`, `sq gitl`)
+
+Implemented in `src/cli/git.rs`:
+
+### `sq gitz [--no-fetch]`
+- Runs `git fetch --prune --quiet` (unless `--no-fetch` is passed; gracefully warns if offline).
+- Prints repository name, active branch, remote repository URL (sanitized of embedded HTTP credentials), and sync status against upstream (`up to date`, `ahead` / unpushed, `behind` / incoming, or `diverged`).
+- Lists up to 15 unpushed commits (`@{u}..HEAD`) and incoming remote commits (`HEAD..@{u}`) with short SHA, relative time, and subject.
+- Groups working tree changes into `conflicts`, `staged`, `modified`, and `untracked`, plus stash count if any.
+
+### `sq gits [message] [--allow-secret]`
+- **Secret Guard:** Scans the repository root via `y_secret::find_unencrypted_secrets` and aborts if any plaintext `.secret.yml`/`.secret.yaml` files exist (override with `--allow-secret`).
+- If local working tree changes exist: runs `git add -A` and `git commit -m <message>` (defaults to `"updated"` when no message is given).
+- If no working tree changes exist: skips commit and pushes any unpushed commits directly (exits cleanly if already up to date).
+- Pushes with up to **3 attempts**, sleeping **1 second** between failed attempts (auto-sets `-u origin <branch>` when no upstream tracking branch exists).
+
+### `sq gitp`
+- Runs `git pull --rebase --autostash` with up to **3 attempts** and **1-second sleep** on transient network errors.
+- Detects rebase conflicts immediately (without retrying) and instructs the user to resolve them.
+
+### `sq gitr [-y|-f|--yes|--force]`
+- Runs best-effort `git fetch --quiet`, summarizes exactly how many unpushed commits, modified/staged files, and untracked items will be dropped, and prompts `proceed with hard reset? [y/N]:` unless `-y`/`-f`/`--yes`/`--force` is passed.
+- Executes `git reset --hard <target>` (`@{u}`, falling back to `origin/<branch>`, then `HEAD`) followed by `git clean -fd`.
+
+### `sq gitb [branch]`
+- With `[branch]`: runs `git checkout <branch>` directly.
+- Without arguments: launches `fzf` grouped into `local` (with active branch marked `* `) and `remote` (excluding `HEAD` and branches already present locally), separated by a non-selectable blank separator (`S`). Selecting a remote branch runs `git checkout --track <remote-branch>`.
+
+### `sq gitl [count | -n <count>]`
+- Prints a compact, colored visual commit graph log (`git log --graph --decorate --color=always`, default `20` commits) showing short SHA, refs, subject, relative time, and author.

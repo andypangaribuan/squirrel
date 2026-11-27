@@ -40,8 +40,7 @@ pub fn run(args: &[String]) {
         std::process::exit(1);
     }
 
-    let mut unencrypted_files = Vec::new();
-    scan_dir(root_path, &mut unencrypted_files);
+    let unencrypted_files = find_unencrypted_secrets(root_path);
 
     if unencrypted_files.is_empty() {
         util::print(color::green("all .secret.yml files are encrypted"));
@@ -95,6 +94,13 @@ pub fn run(args: &[String]) {
             }
         }
     }
+}
+
+pub fn find_unencrypted_secrets(root_path: &Path) -> Vec<String> {
+    let mut unencrypted_files = Vec::new();
+    scan_dir(root_path, &mut unencrypted_files);
+    unencrypted_files.sort();
+    unencrypted_files
 }
 
 fn scan_dir(dir: &Path, unencrypted_files: &mut Vec<String>) {

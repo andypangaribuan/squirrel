@@ -24,6 +24,12 @@ fn main() {
     match args[0].as_str() {
         "choose" => cli::choose::run(&args[1..]),
         "docker" => cli::docker::run(&args[1..]),
+        "gitb" => cli::git::run_gitb(&args[1..]),
+        "gitl" => cli::git::run_gitl(&args[1..]),
+        "gitp" => cli::git::run_gitp(&args[1..]),
+        "gitr" => cli::git::run_gitr(&args[1..]),
+        "gits" => cli::git::run_gits(&args[1..]),
+        "gitz" => cli::git::run_gitz(&args[1..]),
         "kube" => cli::kube::run(&args[1..]),
         "ls" => cli::ls::run(&args[1..]),
         "prereq" => cli::prereq::run(&args[1..]),
@@ -46,6 +52,12 @@ usage: sq
 {commands}
   choose     interactive selector with fzf
   docker     execute docker cli
+  gitb       interactively switch git branch with fzf
+  gitl       show compact visual git commit graph log
+  gitp       pull remote commits with rebase, autostash & retries
+  gitr       hard reset local git repo to upstream (with confirmation)
+  gits       secret-checked commit all changes and push with retries
+  gitz       fetch remote and show rich git status & commit sync info
   kube       execute kubectl cli
   ls         show files and directories in a tree list
   prereq     show third-party CLI prerequisites for current OS

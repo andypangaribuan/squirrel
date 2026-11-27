@@ -31,6 +31,12 @@ sq --version
 | :--- | :--- |
 | `sq choose` | Interactive fuzzy item selector with `fzf` |
 | `sq docker` | Clean formatted `docker ps` (`-c/--compact`) and `docker images` (`-c/--contains`) |
+| `sq gitz` | Fetch remote and display rich git status, unpushed/incoming commits, and grouped file changes |
+| `sq gits` | Secret-checked commit all changes (default `"updated"`) and push with up to 3 retries (1s delay) |
+| `sq gitp` | Pull remote commits with `git pull --rebase --autostash` and up to 3 retries |
+| `sq gitr` | Hard reset local git repo to upstream with impact summary & `[y/N]` confirmation (`-y`/`-f` to skip) |
+| `sq gitb` | Interactive `fzf` branch switcher (local & remote) |
+| `sq gitl` | Compact colored git commit graph log (`[count]`, default `20`) |
 | `sq kube` | Kubernetes pod viewer, YAML template renderer, `apply`/`diff`/`delete`/`conf`/`secret`, and pod ops |
 | `sq ls` | Colorized tree-formatted directory & file listing (`--d<N>` depth, `--size` recursive sizes) |
 | `sq prereq` | Shows third-party CLI prerequisite status and install commands for the current OS (macOS / Debian Linux) |

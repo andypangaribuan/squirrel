@@ -35,6 +35,7 @@ squirrel/
 │       ├── mod.rs      # Subcommand module exports
 │       ├── choose.rs   # `sq choose` — fzf-based interactive selector
 │       ├── docker.rs   # `sq docker` — formatted `ps` and `images`
+│       ├── git.rs      # `sq gitz`, `sq gits`, `sq gitp`, `sq gitr`, `sq gitb`, `sq gitl` — git workflow shortcuts
 │       ├── ls.rs       # `sq ls` — colorized tree-formatted directory & size listing
 │       ├── prereq.rs   # `sq prereq` — OS-specific third-party CLI install guide (macOS / Debian Linux)
 │       ├── ssh.rs      # `sq ssh` — fzf-powered SSH host selector grouped by ~/.ssh/config & config.d

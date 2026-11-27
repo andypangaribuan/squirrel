@@ -9,6 +9,7 @@
 
 pub mod choose;
 pub mod docker;
+pub mod git;
 pub mod kube;
 pub mod ls;
 pub mod prereq;
