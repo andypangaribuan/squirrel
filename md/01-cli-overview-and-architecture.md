@@ -13,6 +13,7 @@
 | `sq gitp` | Pulls remote commits with `git pull --rebase --autostash` (up to 3 retries on transient errors; stops immediately on conflicts) | `git` |
 | `sq gitr` | Hard resets local repo to upstream (dropping unpushed commits) and cleans modified/untracked files with `[y/N]` confirmation (`-y`/`-f` to skip) | `git` |
 | `sq gitb` | Interactive `fzf` branch switcher grouped into local & remote branches (or direct checkout with `[branch]`) | `git`, `fzf` |
+| `sq gitd` | Prints full, pager-free, colorized git diff with old/new line numbers and clean per-file headers (`--staged`, `[path...]`) | `git` |
 | `sq gitl` | Compact colored commit graph log (`[count]` or `-n <count>`, default `20`) | `git` |
 | `sq kube` | Kubernetes pod dashboards, YAML templating, secret encryption/diffing, and pod operations | `kubectl`, `stern`, `watch`, `unbuffer` (`expect`), optional `docker` (`--cloud-sdk-container`) |
 | `sq ls` | Colorized tree-formatted directory and file listing with configurable depth (`--d<N>`) and recursive size calculation (`--size`) | Built-in |

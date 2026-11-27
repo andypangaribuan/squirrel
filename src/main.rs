@@ -11,7 +11,7 @@ mod cli;
 mod color;
 mod util;
 
-const VERSION: &str = "2.1.15";
+const VERSION: &str = "2.1.16";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -25,6 +25,7 @@ fn main() {
         "choose" => cli::choose::run(&args[1..]),
         "docker" => cli::docker::run(&args[1..]),
         "gitb" => cli::git::run_gitb(&args[1..]),
+        "gitd" => cli::git::run_gitd(&args[1..]),
         "gitl" => cli::git::run_gitl(&args[1..]),
         "gitp" => cli::git::run_gitp(&args[1..]),
         "gitr" => cli::git::run_gitr(&args[1..]),
@@ -53,6 +54,7 @@ usage: sq
   choose     interactive selector with fzf
   docker     execute docker cli
   gitb       interactively switch git branch with fzf
+  gitd       print full, clean colorized git diff with line numbers
   gitl       show compact visual git commit graph log
   gitp       pull remote commits with rebase, autostash & retries
   gitr       hard reset local git repo to upstream (with confirmation)

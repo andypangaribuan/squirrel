@@ -146,7 +146,7 @@ sq prereq
 
 ---
 
-## 7. Git Shortcuts (`sq gitz`, `sq gits`, `sq gitp`, `sq gitr`, `sq gitb`, `sq gitl`)
+## 7. Git Shortcuts (`sq gitz`, `sq gits`, `sq gitp`, `sq gitr`, `sq gitb`, `sq gitd`, `sq gitl`)
 
 Implemented in `src/cli/git.rs`:
 
@@ -173,6 +173,10 @@ Implemented in `src/cli/git.rs`:
 ### `sq gitb [branch]`
 - With `[branch]`: runs `git checkout <branch>` directly.
 - Without arguments: launches `fzf` grouped into `local` (with active branch marked `* `) and `remote` (excluding `HEAD` and branches already present locally), separated by a non-selectable blank separator (`S`). Selecting a remote branch runs `git checkout --track <remote-branch>`.
+
+### `sq gitd [-s|--staged|--cached] [path...]`
+- Prints the full diff directly to stdout (no pager) with clean per-file headers (`<path>  +<added> -<deleted>` and `[new]`/`[deleted]`/`[renamed]`/`[binary]` badges), stripping noisy `diff --git`, `index`, `---`/`+++`, and `@@` boilerplate.
+- Renders aligned old/new line numbers with colorized `+` (green), `-` (red), and context lines, separated by `⋮` between hunks.
 
 ### `sq gitl [count | -n <count>]`
 - Prints a compact, colored visual commit graph log (`git log --graph --decorate --color=always`, default `20` commits) showing short SHA, refs, subject, relative time, and author.

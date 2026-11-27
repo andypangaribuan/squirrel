@@ -36,6 +36,7 @@ sq --version
 | `sq gitp` | Pull remote commits with `git pull --rebase --autostash` and up to 3 retries |
 | `sq gitr` | Hard reset local git repo to upstream with impact summary & `[y/N]` confirmation (`-y`/`-f` to skip) |
 | `sq gitb` | Interactive `fzf` branch switcher (local & remote) |
+| `sq gitd` | Full, pager-free, colorized git diff with line numbers (`-s`/`--staged`, `[path...]`) |
 | `sq gitl` | Compact colored git commit graph log (`[count]`, default `20`) |
 | `sq kube` | Kubernetes pod viewer, YAML template renderer, `apply`/`diff`/`delete`/`conf`/`secret`, and pod ops |
 | `sq ls` | Colorized tree-formatted directory & file listing (`--d<N>` depth, `--size` recursive sizes) |

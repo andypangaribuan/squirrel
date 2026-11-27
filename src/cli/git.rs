@@ -559,6 +559,281 @@ pub fn run_gitl(args: &[String]) {
     }
 }
 
+pub fn run_gitd(args: &[String]) {
+    let mut staged_only = false;
+    let mut paths: Vec<String> = Vec::new();
+
+    for arg in args {
+        if arg == "-h" || arg == "--help" {
+            print_gitd_help();
+            return;
+        } else if arg == "--staged" || arg == "--cached" || arg == "-s" {
+            staged_only = true;
+        } else {
+            paths.push(arg.clone());
+        }
+    }
+
+    ensure_git_repo();
+
+    let mut diff_args: Vec<String> = vec!["--no-pager".into(), "diff".into(), "--no-color".into(), "--no-ext-diff".into()];
+    if staged_only {
+        diff_args.push("--cached".into());
+    } else {
+        let (has_head, _, _) = git_cmd(&["rev-parse", "--verify", "HEAD"]);
+        if has_head {
+            diff_args.push("HEAD".into());
+        }
+    }
+
+    if !paths.is_empty() {
+        diff_args.push("--".into());
+        diff_args.extend(paths);
+    }
+
+    let arg_refs: Vec<&str> = diff_args.iter().map(|s| s.as_str()).collect();
+    let (ok, out, err) = git_cmd(&arg_refs);
+    if !ok {
+        eprintln!("{}", color::bold_red(&format!("Error running git diff: {}", err.trim())));
+        std::process::exit(1);
+    }
+
+    if out.trim().is_empty() {
+        println!("{}", color::green("✓ no changes"));
+        return;
+    }
+
+    let files = parse_unified_diff(&out);
+    if files.is_empty() {
+        println!("{}", color::green("✓ no changes"));
+        return;
+    }
+
+    util::print(render_clean_diff(&files));
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum DiffLineKind {
+    Context,
+    Added,
+    Deleted,
+    HunkSep(String),
+    Note,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct DiffLine {
+    old_num: Option<usize>,
+    new_num: Option<usize>,
+    kind: DiffLineKind,
+    text: String,
+}
+
+#[derive(Debug, Default)]
+struct DiffFile {
+    path: String,
+    badge: Option<String>,
+    is_binary: bool,
+    added: usize,
+    deleted: usize,
+    lines: Vec<DiffLine>,
+}
+
+fn parse_hunk_header(line: &str) -> Option<(usize, usize, String)> {
+    // Format: @@ -old_start[,old_count] +new_start[,new_count] @@[ context]
+    let rest = line.strip_prefix("@@ ")?;
+    let end_idx = rest.find(" @@")?;
+    let range_part = &rest[..end_idx];
+    let context = rest[end_idx + 3..].trim().to_string();
+
+    let mut parts = range_part.split_whitespace();
+    let old_part = parts.next()?.strip_prefix('-')?;
+    let new_part = parts.next()?.strip_prefix('+')?;
+
+    let old_start = old_part.split(',').next()?.parse::<usize>().ok()?;
+    let new_start = new_part.split(',').next()?.parse::<usize>().ok()?;
+
+    Some((old_start, new_start, context))
+}
+
+fn parse_unified_diff(raw: &str) -> Vec<DiffFile> {
+    let mut files: Vec<DiffFile> = Vec::new();
+    let mut current: Option<DiffFile> = None;
+    let mut old_line: usize = 0;
+    let mut new_line: usize = 0;
+    let mut in_hunk = false;
+    let mut hunk_count: usize = 0;
+    let mut rename_from: Option<String> = None;
+
+    for line in raw.lines() {
+        if let Some(rest) = line.strip_prefix("diff --git ") {
+            if let Some(f) = current.take() {
+                files.push(f);
+            }
+            let path = rest.split(" b/").nth(1).unwrap_or(rest).to_string();
+            current = Some(DiffFile { path, ..Default::default() });
+            in_hunk = false;
+            hunk_count = 0;
+            rename_from = None;
+            continue;
+        }
+
+        let Some(file) = current.as_mut() else {
+            continue;
+        };
+
+        if !in_hunk {
+            if line.starts_with("new file mode") {
+                file.badge = Some("new".to_string());
+                continue;
+            } else if line.starts_with("deleted file mode") {
+                file.badge = Some("deleted".to_string());
+                continue;
+            } else if let Some(from) = line.strip_prefix("rename from ") {
+                rename_from = Some(from.to_string());
+                continue;
+            } else if let Some(to) = line.strip_prefix("rename to ") {
+                file.path = to.to_string();
+                if let Some(ref from) = rename_from {
+                    file.badge = Some(format!("renamed from {}", from));
+                } else {
+                    file.badge = Some("renamed".to_string());
+                }
+                continue;
+            } else if line.starts_with("Binary files ") && line.ends_with(" differ") {
+                file.is_binary = true;
+                continue;
+            } else if line.starts_with("index ")
+                || line.starts_with("--- ")
+                || line.starts_with("+++ ")
+                || line.starts_with("old mode ")
+                || line.starts_with("new mode ")
+                || line.starts_with("similarity index ")
+                || line.starts_with("dissimilarity index ")
+            {
+                continue;
+            }
+        }
+
+        if line.starts_with("@@ ")
+            && let Some((o_start, n_start, ctx)) = parse_hunk_header(line)
+        {
+            if hunk_count > 0 {
+                file.lines.push(DiffLine { old_num: None, new_num: None, kind: DiffLineKind::HunkSep(ctx), text: String::new() });
+            }
+            old_line = o_start;
+            new_line = n_start;
+            in_hunk = true;
+            hunk_count += 1;
+            continue;
+        }
+
+        if !in_hunk {
+            continue;
+        }
+
+        if let Some(content) = line.strip_prefix('+') {
+            file.added += 1;
+            file.lines.push(DiffLine { old_num: None, new_num: Some(new_line), kind: DiffLineKind::Added, text: content.to_string() });
+            new_line += 1;
+        } else if let Some(content) = line.strip_prefix('-') {
+            file.deleted += 1;
+            file.lines.push(DiffLine { old_num: Some(old_line), new_num: None, kind: DiffLineKind::Deleted, text: content.to_string() });
+            old_line += 1;
+        } else if let Some(content) = line.strip_prefix(' ') {
+            file.lines.push(DiffLine {
+                old_num: Some(old_line),
+                new_num: Some(new_line),
+                kind: DiffLineKind::Context,
+                text: content.to_string(),
+            });
+            old_line += 1;
+            new_line += 1;
+        } else if line.starts_with('\\') {
+            file.lines.push(DiffLine { old_num: None, new_num: None, kind: DiffLineKind::Note, text: line.to_string() });
+        }
+    }
+
+    if let Some(f) = current.take() {
+        files.push(f);
+    }
+
+    files
+}
+
+fn render_clean_diff(files: &[DiffFile]) -> String {
+    let mut blocks: Vec<String> = Vec::new();
+
+    for file in files {
+        let mut lines: Vec<String> = Vec::new();
+
+        let mut header = format!("\x1b[1;36m{}\x1b[0m", file.path);
+        if let Some(ref badge) = file.badge {
+            header.push_str(&format!("  {}", color::yellow(&format!("[{}]", badge))));
+        }
+        if file.is_binary {
+            header.push_str(&format!("  {}", color::gray("[binary]")));
+        } else {
+            let mut stats = Vec::new();
+            if file.added > 0 {
+                stats.push(color::green(&format!("+{}", file.added)));
+            }
+            if file.deleted > 0 {
+                stats.push(color::red(&format!("-{}", file.deleted)));
+            }
+            if !stats.is_empty() {
+                header.push_str(&format!("  {}", stats.join(" ")));
+            }
+        }
+        lines.push(header);
+
+        if file.is_binary {
+            lines.push(format!("  {}", color::gray("(binary file changed)")));
+            blocks.push(lines.join("\n"));
+            continue;
+        }
+
+        let max_num = file.lines.iter().filter_map(|l| l.old_num.max(l.new_num)).max().unwrap_or(1);
+        let w = max_num.to_string().len().max(3);
+
+        for dl in &file.lines {
+            match &dl.kind {
+                DiffLineKind::HunkSep(ctx) => {
+                    let pad = " ".repeat(w * 2 + 1);
+                    if ctx.is_empty() {
+                        lines.push(color::gray(&format!("{} ⋮", pad)));
+                    } else {
+                        lines.push(color::gray(&format!("{} ⋮  {}", pad, ctx)));
+                    }
+                }
+                DiffLineKind::Context => {
+                    let o = dl.old_num.map(|n| n.to_string()).unwrap_or_default();
+                    let n = dl.new_num.map(|n| n.to_string()).unwrap_or_default();
+                    lines.push(format!("{} {}", color::gray(&format!("{:>w$} {:>w$} │", o, n, w = w)), dl.text));
+                }
+                DiffLineKind::Added => {
+                    let n = dl.new_num.map(|n| n.to_string()).unwrap_or_default();
+                    let gutter = color::green(&format!("{:>w$} {:>w$} │", "", n, w = w));
+                    lines.push(format!("{} {}", gutter, color::green(&format!("+{}", dl.text))));
+                }
+                DiffLineKind::Deleted => {
+                    let o = dl.old_num.map(|n| n.to_string()).unwrap_or_default();
+                    let gutter = color::red(&format!("{:>w$} {:>w$} │", o, "", w = w));
+                    lines.push(format!("{} {}", gutter, color::red(&format!("-{}", dl.text))));
+                }
+                DiffLineKind::Note => {
+                    let pad = " ".repeat(w * 2 + 1);
+                    lines.push(color::gray(&format!("{} │ {}", pad, dl.text)));
+                }
+            }
+        }
+
+        blocks.push(lines.join("\n"));
+    }
+
+    blocks.join("\n\n")
+}
+
 fn checkout_branch(target: &str, is_remote: bool) {
     let (ok, out, err) = if is_remote { git_cmd(&["checkout", "--track", target]) } else { git_cmd(&["checkout", target]) };
     if ok {
@@ -854,6 +1129,23 @@ usage: sq gitl [count]
     ));
 }
 
+fn print_gitd_help() {
+    let arguments = color::bold_green("arguments:");
+    let options = color::bold_green("options:");
+    util::print(format!(
+        r#"
+info : print full, clean colorized git diff with line numbers (no pager)
+usage: sq gitd [options] [path...]
+
+{arguments}
+  path...                optional file or directory path filter(s)
+
+{options}
+  -s, --staged, --cached show only staged changes
+  -h, --help             show this help message"#
+    ));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -903,5 +1195,32 @@ mod tests {
         assert_eq!(sanitize_remote_url("git@github.com:user/repo.git"), "git@github.com:user/repo.git");
         assert_eq!(sanitize_remote_url("https://github.com/user/repo.git"), "https://github.com/user/repo.git");
         assert_eq!(sanitize_remote_url("https://user:ghp_secret@github.com/user/repo.git"), "https://github.com/user/repo.git");
+    }
+
+    #[test]
+    fn test_parse_unified_diff_clean() {
+        let sample = r#"diff --git a/src/main.rs b/src/main.rs
+index 66527a7..f27b1e0 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -11,3 +11,4 @@ mod cli;
+ mod cli;
+-const OLD: &str = "1";
++const NEW: &str = "2";
++const EXTRA: &str = "3";
+"#;
+        let files = parse_unified_diff(sample);
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "src/main.rs");
+        assert_eq!(files[0].added, 2);
+        assert_eq!(files[0].deleted, 1);
+        assert_eq!(files[0].lines.len(), 4);
+        assert_eq!(files[0].lines[0].old_num, Some(11));
+        assert_eq!(files[0].lines[0].new_num, Some(11));
+        assert_eq!(files[0].lines[1].old_num, Some(12));
+        assert_eq!(files[0].lines[1].new_num, None);
+        assert_eq!(files[0].lines[2].old_num, None);
+        assert_eq!(files[0].lines[2].new_num, Some(12));
+        assert_eq!(files[0].lines[3].new_num, Some(13));
     }
 }
